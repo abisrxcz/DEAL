@@ -1,0 +1,113 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  :root {
+    --brand-dark-blue: #1D396B;
+    --brand-light-blue: #8AAEE0;
+    --brand-ice-blue: #B1C9EF;
+    --dark-navy: #0F172A;
+    --dark-slate: #1E293B;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Chrome metallic trim accents inspired by Philippine Jeepney craftsmanship */
+.chrome-trim {
+  border-top: 2px solid #E2E8F0;
+  border-bottom: 2px solid #94A3B8;
+  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* Extra-slow, deliberate left-to-right truck transit animation */
+@keyframes truckDriveL2RExtraSlow {
+  0% {
+    transform: translateX(-140%);
+  }
+  100% {
+    transform: translateX(calc(100vw + 340px));
+  }
+}
+
+@keyframes wheelSpinForward {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes hornPulse {
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+}
+
+@keyframes overlayFadeOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.96);
+    pointer-events: none;
+  }
+}
+
+.animate-truck-extra-slow {
+  animation: truckDriveL2RExtraSlow 9.5s cubic-bezier(0.2, 0.7, 0.35, 1) forwards;
+}
+
+.animate-wheel-slow {
+  animation: wheelSpinForward 0.9s linear infinite;
+}
+
+.animate-horn {
+  animation: hornPulse 0.4s ease-in-out infinite alternate;
+}
+
+.animate-overlay-fade {
+  animation: overlayFadeOut 0.9s ease-out forwards;
+}
+
+/* Soft blurring & fading edge mask for cinematic center modal (no hard rectangular borders) */
+.fading-blur-container {
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  mask-image: radial-gradient(ellipse 96% 90% at 50% 50%, black 50%, rgba(0, 0, 0, 0.8) 75%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 96% 90% at 50% 50%, black 50%, rgba(0, 0, 0, 0.8) 75%, transparent 100%);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0F172A;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2563EB;
+}
