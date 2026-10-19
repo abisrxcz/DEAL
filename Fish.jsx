@@ -33,10 +33,13 @@ import {
     Plus,
     CheckCircle2,
     AlertTriangle,
-    Camera,
     Play,
     Volume2,
-    VolumeX
+    VolumeX,
+    Camera,
+    Upload,
+    Image as ImageIcon,
+    Anchor
 } from 'lucide-react';
 
 // ==========================================
@@ -125,6 +128,29 @@ const TRANSLATIONS = {
         simSignal: "Simulate No Signal at Pier"
     }
 };
+
+const SURI_QUALITY_CHECKS = [
+    {
+        key: 'bottomSample',
+        title: 'Bottom core sample',
+        description: 'Pull and inspect fish from the bottom layer for freshness and consistency.'
+    },
+    {
+        key: 'gillEye',
+        title: 'Gill & eye freshness',
+        description: 'Check for clear eyes, firm flesh, and bright red gills.'
+    },
+    {
+        key: 'weightMatch',
+        title: 'Weight and species match',
+        description: 'Confirm the sampled fish matches the declared batch species and weight.'
+    },
+    {
+        key: 'photoProof',
+        title: 'Multi-angle proof reviewed',
+        description: 'Review dockside evidence from the top, middle, and bottom of the bañera.'
+    }
+];
 
 // ==========================================
 // 2. STRICT RAW / FRESH SEAFOOD CATALOG
@@ -413,6 +439,40 @@ export default function App() {
         }
     ]);
 
+    // Pier Checker Incoming Catch Entry Form State
+    const [showIncomingCatchModal, setShowIncomingCatchModal] = useState(false);
+    const [incomingCatchForm, setIncomingCatchForm] = useState({
+        name: 'Galunggong (Round Scad)',
+        localTerm: 'Dagupan Blackfin Galunggong (Fresh Catch)',
+        scientificName: 'Decapterus punctatus',
+        category: 'Pelagic',
+        qualityTier: 'Grade AAA Pier Fresh',
+        banyeraWeightKg: 40,
+        availableBanyeras: 15,
+        pricePerKg: 185,
+        startingBidPerKg: 175,
+        landingStation: 'Pier 2 Dock B',
+        vesselOrigin: 'F/V San Miguel Navotas',
+        photoUrl: ''
+    });
+
+    const [qualityBatch, setQualityBatch] = useState({
+        batchId: '',
+        fishName: '',
+        species: '',
+        weightKg: '',
+        photoUrl: '',
+        photoFile: null
+    });
+    const [photoPreview, setPhotoPreview] = useState('');
+    const [qualityChecklist, setQualityChecklist] = useState({
+        bottomSample: false,
+        gillEye: false,
+        weightMatch: false,
+        photoProof: false
+    });
+    const [qualityValidations, setQualityValidations] = useState([]);
+
     const t = TRANSLATIONS[language];
 
     // Helper Toast
@@ -528,6 +588,150 @@ export default function App() {
         showToast(`🔒 Authenticated as ${authActiveTab === 'vendor' ? 'Micro-Vendor' : authActiveTab === 'checker' ? 'Pier Checker' : 'Consignee Broker'} • Secured Port Token Issued!`);
     };
 
+    const handlePhotoFileChange = (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) {
+            const previewUrl = URL.createObjectURL(file);
+            setPhotoPreview(previewUrl);
+            setQualityBatch(prev => ({
+                ...prev,
+                photoFile: file,
+                photoUrl: previewUrl
+            }));
+            setQualityChecklist(prev => ({
+                ...prev,
+                photoProof: true
+            }));
+            showToast("📷 Dockside inspection photo uploaded and attached!", "info");
+        }
+    };
+
+    const handleLogIncomingCatch = (e) => {
+        if (e) e.preventDefault();
+        const weight = Number(incomingCatchForm.banyeraWeightKg);
+        const banyeras = Number(incomingCatchForm.availableBanyeras);
+        const price = Number(incomingCatchForm.pricePerKg);
+        const startingBid = Number(incomingCatchForm.startingBidPerKg);
+
+        if (!incomingCatchForm.name.trim() || !incomingCatchForm.localTerm.trim()) {
+            showToast('Please enter both fish common name and local description.', 'error');
+            return;
+        }
+
+        if (!Number.isFinite(weight) || weight <= 0 || !Number.isFinite(banyeras) || banyeras <= 0) {
+            showToast('Please enter valid positive numbers for bañera weight and available stock.', 'error');
+            return;
+        }
+
+        if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(startingBid) || startingBid <= 0) {
+            showToast('Please enter valid positive prices for wholesale base and starting bid.', 'error');
+            return;
+        }
+
+        // Generate a unique ID (e.g. CAT-007, CAT-008)
+        const maxCatNum = fishListings.reduce((max, f) => {
+            const match = f.id && f.id.match(/^CAT-(\d+)$/);
+            return match ? Math.max(max, parseInt(match[1], 10)) : max;
+        }, 0);
+        const newId = `CAT-${String(maxCatNum + 1).padStart(3, '0')}`;
+
+        const newCatch = {
+            id: newId,
+            name: incomingCatchForm.name.trim(),
+            localTerm: incomingCatchForm.localTerm.trim(),
+            scientificName: incomingCatchForm.scientificName.trim() || 'Species sp.',
+            category: incomingCatchForm.category || 'Pelagic',
+            qualityTier: incomingCatchForm.qualityTier || 'Grade AAA Pier Fresh',
+            gillColor: 'Vibrant Crimson Red',
+            hasangScore: 9.8,
+            iceCondition: 'Crushed Slush Ice (-2°C)',
+            pricePerKg: price,
+            startingBidPerKg: startingBid,
+            currentTopBidPerKg: startingBid,
+            banyeraWeightKg: weight,
+            availableBanyeras: banyeras,
+            landingTime: `Just now • ${incomingCatchForm.landingStation}`,
+            vesselOrigin: incomingCatchForm.vesselOrigin.trim() || 'Navotas Dockside Fleet',
+            isAntiLayeredVerified: false,
+            checkerBadge: `${authCredentials.checkerId || 'TC-NAV-402'} (${incomingCatchForm.landingStation})`,
+            poolAllocations: [],
+            image: incomingCatchForm.photoUrl.trim() || 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80',
+            freshProofNote: `Dockside catch registered by Pier Checker. Pending Suri-Isda anti-layering physical audit.`
+        };
+
+        setFishListings(prev => [newCatch, ...prev]);
+        setShowIncomingCatchModal(false);
+        setIncomingCatchForm({
+            name: '',
+            localTerm: '',
+            scientificName: '',
+            category: 'Pelagic',
+            qualityTier: 'Grade AAA Pier Fresh',
+            banyeraWeightKg: 40,
+            availableBanyeras: 15,
+            pricePerKg: 185,
+            startingBidPerKg: 175,
+            landingStation: 'Pier 2 Dock B',
+            vesselOrigin: 'F/V San Miguel Navotas',
+            photoUrl: ''
+        });
+        setActiveTab('listings');
+        showToast(`🐟 Successfully logged incoming catch: ${newCatch.name} (${newCatch.id}) at ${incomingCatchForm.landingStation}!`, 'success');
+    };
+
+    const handleValidateBatch = (e) => {
+        e.preventDefault();
+        const weightKg = Number(qualityBatch.weightKg);
+        const resolvedFishName = qualityBatch.fishName.trim() || qualityBatch.species.trim();
+        const resolvedSpecies = qualityBatch.species.trim() || qualityBatch.fishName.trim();
+
+        if (!qualityBatch.batchId.trim() || !resolvedFishName || !Number.isFinite(weightKg) || weightKg <= 0) {
+            showToast('Enter a batch ID, fish name / species, and a valid weight before recording the inspection.', 'error');
+            return;
+        }
+
+        const failedChecks = SURI_QUALITY_CHECKS
+            .filter(check => !qualityChecklist[check.key])
+            .map(check => check.title);
+        const approved = failedChecks.length === 0;
+        const validator = currentRole === 'vendor'
+            ? 'Micro-Vendor'
+            : currentRole === 'checker'
+                ? 'Pier Checker'
+                : 'Consignee Broker';
+
+        const finalPhotoUrl = photoPreview || qualityBatch.photoUrl.trim() || 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80';
+
+        setQualityValidations(previous => [{
+            id: `DEAL-SRI-${Date.now()}`,
+            batchId: qualityBatch.batchId.trim(),
+            fishName: resolvedFishName,
+            species: resolvedSpecies,
+            weightKg,
+            validator,
+            timestamp: new Date().toLocaleString(),
+            approved,
+            failedChecks,
+            photoUrl: finalPhotoUrl
+        }, ...previous]);
+
+        setQualityBatch({ batchId: '', fishName: '', species: '', weightKg: '', photoUrl: '', photoFile: null });
+        setPhotoPreview('');
+        setQualityChecklist({
+            bottomSample: false,
+            gillEye: false,
+            weightMatch: false,
+            photoProof: false
+        });
+
+        showToast(
+            approved
+                ? `Suri-Isda check passed. Batch ${qualityBatch.batchId.trim()} (${resolvedFishName}) is validated for auction.`
+                : `Batch ${qualityBatch.batchId.trim()} flagged. Failed checks: ${failedChecks.join(', ')}.`,
+            approved ? 'success' : 'warning'
+        );
+    };
+
     const handleClaimPortion = (fish, weightToClaim) => {
         const currentClaimed = fish.poolAllocations.reduce((sum, item) => sum + item.weight, 0);
         const remaining = fish.banyeraWeightKg - currentClaimed;
@@ -607,7 +811,7 @@ export default function App() {
     };
 
     return (
-        <div className={`min-h-screen font-sans flex flex-col selection:bg-[#93C5FD] selection:text-[#0F172A] transition-colors duration-200 relative ${theme === 'light'
+        <div className={`min-h-screen font-mono flex flex-col selection:bg-[#93C5FD] selection:text-[#0F172A] transition-colors duration-200 relative ${theme === 'light'
             ? 'bg-[#F8FAFC] text-[#0F172A]' // LIGHT MODE DEFAULT: Clean neutral bg, plain blue accents, no gradients
             : 'bg-[#0F172A] text-[#F8FAFC]' // DARK MODE: Dual-tone #1E293B containers on #0F172A deep navy with blue #2563EB highlights
             }`}>
@@ -747,7 +951,7 @@ export default function App() {
                             <div>
                                 <h3 className="text-xl sm:text-2xl font-black tracking-wider uppercase font-mono text-white flex items-center justify-center sm:justify-start gap-2">
                                     <span>DEAL</span>
-                                    <span className="text-xs bg-[#2563EB] text-white px-2 py-0.5 rounded font-sans font-bold">
+                                    <span className="text-xs bg-[#2563EB] text-white px-2 py-0.5 rounded font-mono font-bold">
                                         Navotas Consignation Hub
                                     </span>
                                 </h3>
@@ -939,6 +1143,19 @@ export default function App() {
                     {/* Role Access / Auth Trigger */}
                     <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
 
+                        {/* Pier Checker: Persistent Log Incoming Catch Button */}
+                        {currentRole === 'checker' && (
+                            <button
+                                onClick={() => setShowIncomingCatchModal(true)}
+                                id="btn-log-incoming-catch-header"
+                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white border border-emerald-400 rounded-xl text-xs font-black transition flex items-center gap-1.5 shadow"
+                                title="Log newly landed raw catch at dockside"
+                            >
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>Log Incoming Catch</span>
+                            </button>
+                        )}
+
                         {/* Current Role Indicator Pill */}
                         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold ${theme === 'light'
                             ? 'bg-[#F1F5F9] border-[#CBD5E1] text-[#1D396B]'
@@ -989,17 +1206,6 @@ export default function App() {
                     </button>
 
                     <button
-                        onClick={() => setActiveTab('pooling')}
-                        className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition whitespace-nowrap ${activeTab === 'pooling'
-                            ? 'bg-[#2563EB] text-white shadow-sm'
-                            : theme === 'light' ? 'text-slate-600 hover:bg-[#F1F5F9]' : 'text-slate-300 hover:bg-[#0F172A]'
-                            }`}
-                    >
-                        <Scale className="w-4 h-4" />
-                        <span>{t.navPooling}</span>
-                    </button>
-
-                    <button
                         onClick={() => setActiveTab('calculator')}
                         className={`flex items-center gap-2 px-3.5 py-2 rounded-xl transition whitespace-nowrap ${activeTab === 'calculator'
                             ? 'bg-[#2563EB] text-white shadow-sm'
@@ -1019,6 +1225,7 @@ export default function App() {
                     >
                         <ShieldCheck className="w-4 h-4" />
                         <span>{t.navInspector}</span>
+                        <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full font-black">All roles</span>
                     </button>
 
                     <button
@@ -1081,6 +1288,39 @@ export default function App() {
                 {/* ==================================================== */}
                 {activeTab === 'listings' && (
                     <div className="space-y-5">
+
+                        {/* Pier Checker Persistent Dashboard Action Banner */}
+                        {currentRole === 'checker' && (
+                            <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 ${theme === 'light'
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-950 shadow-sm'
+                                : 'bg-emerald-950/40 border-emerald-500/60 text-emerald-200 shadow-sm'
+                                }`}>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-emerald-600 border border-emerald-400 flex items-center justify-center text-white font-black shadow flex-shrink-0">
+                                        <Anchor className="w-5 h-5 text-emerald-100" />
+                                    </div>
+                                    <div>
+                                        <div className="text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                                            <span>Pier Checker Tally Station Active</span>
+                                            <span className="text-[10px] px-2 py-0.5 bg-emerald-200 dark:bg-emerald-800 text-emerald-900 dark:text-emerald-100 rounded-full font-bold">
+                                                {authCredentials.dockStation || 'Pier 2 Dock B'}
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] opacity-80 mt-0.5">
+                                            Record newly landed raw fish at dockside bays. Logged catches are instantly listed on the live Fresh Catches auction floor.
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setShowIncomingCatchModal(true)}
+                                    id="btn-log-incoming-catch-dashboard"
+                                    className="w-full sm:w-auto px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-black uppercase transition flex items-center justify-center gap-2 shadow flex-shrink-0"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span>Log Incoming Catch</span>
+                                </button>
+                            </div>
+                        )}
 
                         {/* Solid Blue Hero Card with Jeepney Accents (No Gradients) */}
                         <div className={`p-5 rounded-2xl border transition-colors shadow-sm relative overflow-hidden ${theme === 'light'
@@ -1305,95 +1545,7 @@ export default function App() {
                     </div>
                 )}
 
-                {/* ==================================================== */}
-                {/* 2. HATI-HATI (MICRO-POOLING) TAB                     */}
-                {/* ==================================================== */}
-                {activeTab === 'pooling' && (
-                    <div className="space-y-5">
 
-                        <div className={`p-5 rounded-2xl border transition-colors shadow-sm ${theme === 'light' ? 'bg-[#FFFFFF] border-[#CBD5E1]' : 'bg-[#1E293B] border-[#334155]'
-                            }`}>
-                            <div className="flex items-center gap-2">
-                                <span className="bg-[#1D396B] text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">
-                                    Anti-Predatory Pricing
-                                </span>
-                                <span className="text-xs font-bold text-[#2563EB] dark:text-[#93C5FD]">Micro-Vendor Suki Pool</span>
-                            </div>
-                            <h2 className="text-2xl font-black mt-1 uppercase font-mono text-[#1D396B] dark:text-white">
-                                Hati-Hati Bañera Pooling Engine
-                            </h2>
-                            <p className="text-xs mt-1 max-w-2xl font-medium text-slate-600 dark:text-slate-400">
-                                Micro-vendors with limited capital can co-buy high-volume whole bañeras (30kg - 50kg) at pier wholesale price. Locked into an escrow-protected QR pass.
-                            </p>
-                        </div>
-
-                        {/* Active Pools Table */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            {fishListings.map(fish => {
-                                const totalClaimed = fish.poolAllocations.reduce((sum, item) => sum + item.weight, 0);
-                                const remaining = fish.banyeraWeightKg - totalClaimed;
-
-                                return (
-                                    <div
-                                        key={fish.id}
-                                        className={`p-4 rounded-2xl border space-y-3 ${theme === 'light' ? 'bg-[#FFFFFF] border-[#CBD5E1]' : 'bg-[#1E293B] border-[#334155]'
-                                            }`}
-                                    >
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <h3 className="font-black text-sm uppercase text-[#1D396B] dark:text-white">
-                                                    {fish.localTerm}
-                                                </h3>
-                                                <div className="text-[11px] text-[#2563EB] dark:text-[#93C5FD] font-bold">
-                                                    ₱{fish.pricePerKg}/kg • Total Bañera: {fish.banyeraWeightKg}kg
-                                                </div>
-                                            </div>
-                                            <span className={`text-xs font-black px-2.5 py-1 rounded-full ${remaining > 0 ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-500' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                                                }`}>
-                                                {remaining > 0 ? `${remaining}kg Available` : 'Completed'}
-                                            </span>
-                                        </div>
-
-                                        {/* Allocations breakdown list */}
-                                        <div className={`p-3 rounded-xl border space-y-1.5 text-xs ${theme === 'light' ? 'bg-[#F8FAFC] border-[#E2E8F0]' : 'bg-[#0F172A] border-[#334155]'
-                                            }`}>
-                                            <div className="font-extrabold text-[11px] uppercase text-[#2563EB] dark:text-[#93C5FD]">
-                                                Current Suki Participants:
-                                            </div>
-                                            {fish.poolAllocations.length === 0 ? (
-                                                <div className="text-[11px] opacity-70 italic">No portions claimed yet. Be the first to start this pool!</div>
-                                            ) : (
-                                                fish.poolAllocations.map(al => (
-                                                    <div key={al.id} className="flex justify-between items-center text-[11px]">
-                                                        <span>{al.vendor}</span>
-                                                        <span className="font-black text-emerald-600 dark:text-emerald-400">{al.weight} kg ({al.claimedAt})</span>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-
-                                        {/* Quick Claim Button */}
-                                        <button
-                                            onClick={() => {
-                                                setClaimModalFish(fish);
-                                                setPortionKgToClaim(Math.min(10, remaining || 5));
-                                            }}
-                                            disabled={remaining <= 0}
-                                            className={`w-full py-2 rounded-xl text-xs font-black uppercase transition flex items-center justify-center gap-2 ${remaining <= 0
-                                                ? 'bg-slate-300 dark:bg-slate-700 text-slate-500 cursor-not-allowed'
-                                                : 'bg-[#2563EB] hover:bg-[#1D4ED8] text-white'
-                                                }`}
-                                        >
-                                            <Plus className="w-4 h-4" />
-                                            <span>Join Pool & Claim Portion</span>
-                                        </button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                    </div>
-                )}
 
                 {/* ==================================================== */}
                 {/* 3. TARIPA & TALLY CALCULATOR TAB                    */}
@@ -1544,66 +1696,256 @@ export default function App() {
                                 <span className="bg-[#1D396B] text-white text-[10px] font-black px-2 py-0.5 rounded uppercase">
                                     Anti-Patong Fraud Protection
                                 </span>
-                                <span className="text-xs font-bold text-[#2563EB] dark:text-[#93C5FD]">Dockside Verification</span>
+                                <span className="text-xs font-bold text-[#2563EB] dark:text-[#93C5FD]">Open to every portal role</span>
                             </div>
                             <h2 className="text-2xl font-black mt-1 uppercase font-mono text-[#1D396B] dark:text-white">
                                 Suri-Isda Quality & Anti-Layering Guard
                             </h2>
                             <p className="text-xs mt-1 font-medium text-slate-600 dark:text-slate-400">
-                                Eliminates the fraudulent practice of "patong" (placing large, fresh fish on top of a bañera while hiding stale, damaged fish at the bottom). Checked and signed off with multi-angle digital proof.
+                                Micro-vendors, pier checkers, and consignee brokers can inspect and record a batch here. Confirm each check before a batch can pass; any unchecked item flags the batch for review.
                             </p>
                         </div>
 
-                        {/* Inspector Checklist */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-                            <div className={`p-4 rounded-2xl border space-y-2 text-center ${theme === 'light' ? 'bg-[#FFFFFF] border-[#CBD5E1]' : 'bg-[#1E293B] border-[#334155]'
-                                }`}>
-                                <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
-                                <h4 className="font-black text-sm uppercase">Bottom Core Sample</h4>
-                                <p className="text-[11px] opacity-75">Bottom layer fish pulled and inspected for matching weight and freshness.</p>
-                                <span className="inline-block bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-500 text-[10px] font-black px-2 py-0.5 rounded uppercase">Passed</span>
-                            </div>
-
-                            <div className={`p-4 rounded-2xl border space-y-2 text-center ${theme === 'light' ? 'bg-[#FFFFFF] border-[#CBD5E1]' : 'bg-[#1E293B] border-[#334155]'
-                                }`}>
-                                <Sparkles className="w-8 h-8 text-[#2563EB] dark:text-[#93C5FD] mx-auto" />
-                                <h4 className="font-black text-sm uppercase">Gill & Eye Score</h4>
-                                <p className="text-[11px] opacity-75">Cornea transparency, non-sunken eyes, and bright scarlet/crimson hasang verified.</p>
-                                <span className="inline-block bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-500 text-[10px] font-black px-2 py-0.5 rounded uppercase">9.8 / 10 Average</span>
-                            </div>
-
-                            <div className={`p-4 rounded-2xl border space-y-2 text-center ${theme === 'light' ? 'bg-[#FFFFFF] border-[#CBD5E1]' : 'bg-[#1E293B] border-[#334155]'
-                                }`}>
-                                <Camera className="w-8 h-8 text-[#2563EB] dark:text-[#93C5FD] mx-auto" />
-                                <h4 className="font-black text-sm uppercase">Multi-Angle Proofs</h4>
-                                <p className="text-[11px] opacity-75">Timestamped dockside photos securely uploaded to the DEAL chain ledger.</p>
-                                <span className="inline-block bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border border-emerald-500 text-[10px] font-black px-2 py-0.5 rounded uppercase">3 Photos Logged</span>
-                            </div>
-
-                        </div>
-
-                        {/* Checker Station Sign-Off */}
-                        <div className={`p-5 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-4 ${theme === 'light' ? 'bg-[#FFFFFF] border-[#CBD5E1]' : 'bg-[#1E293B] border-[#334155]'
-                            }`}>
-                            <div className="flex items-center gap-3">
-                                <div className="w-12 h-12 rounded-xl bg-[#1D396B] border border-[#93C5FD] flex items-center justify-center font-black text-white">
-                                    #402
-                                </div>
+                        <form
+                            onSubmit={handleValidateBatch}
+                            className={`p-5 rounded-2xl border space-y-5 ${theme === 'light' ? 'bg-[#FFFFFF] border-[#CBD5E1]' : 'bg-[#1E293B] border-[#334155]'}`}
+                        >
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                 <div>
-                                    <div className="text-xs font-black uppercase text-[#1D396B] dark:text-white">Tally Officer: Mang Tomas</div>
-                                    <div className="text-[11px] opacity-70">Pier 1 Tally Station • Badge #402</div>
-                                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">Inspection Token: DEAL-SRI-2026-9901</div>
+                                    <h3 className="font-black text-sm uppercase text-[#1D396B] dark:text-white">Validate a bañera batch</h3>
+                                    <p className="text-[11px] opacity-75 mt-1">Submitting records the outcome under your active portal role.</p>
+                                </div>
+                                <span className="inline-flex w-fit items-center rounded-full bg-blue-50 dark:bg-[#0F172A] border border-blue-200 dark:border-[#334155] px-2.5 py-1 text-[10px] font-black text-[#1D396B] dark:text-[#93C5FD]">
+                                    Active role: {currentRole === 'vendor' ? 'Micro-Vendor' : currentRole === 'checker' ? 'Pier Checker' : 'Consignee Broker'}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                <label className="text-xs font-bold">
+                                    Batch / bañera ID
+                                    <input
+                                        required
+                                        value={qualityBatch.batchId}
+                                        onChange={e => setQualityBatch(previous => ({ ...previous, batchId: e.target.value }))}
+                                        placeholder="e.g. CAT-042"
+                                        className={`mt-1 w-full rounded-xl border px-3 py-2 outline-none font-medium focus:border-blue-500 ${theme === 'light' ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A]' : 'bg-[#0F172A] border-[#334155] text-white'}`}
+                                    />
+                                </label>
+                                <label className="text-xs font-bold">
+                                    Fish Name / Local Term
+                                    <input
+                                        required
+                                        value={qualityBatch.fishName}
+                                        onChange={e => setQualityBatch(previous => ({ ...previous, fishName: e.target.value }))}
+                                        placeholder="e.g. Dagupan Galunggong"
+                                        className={`mt-1 w-full rounded-xl border px-3 py-2 outline-none font-medium focus:border-blue-500 ${theme === 'light' ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A]' : 'bg-[#0F172A] border-[#334155] text-white'}`}
+                                    />
+                                </label>
+                                <label className="text-xs font-bold">
+                                    Fish species / Scientific
+                                    <input
+                                        required
+                                        value={qualityBatch.species}
+                                        onChange={e => setQualityBatch(previous => ({ ...previous, species: e.target.value }))}
+                                        placeholder="e.g. Decapterus punctatus"
+                                        className={`mt-1 w-full rounded-xl border px-3 py-2 outline-none font-medium focus:border-blue-500 ${theme === 'light' ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A]' : 'bg-[#0F172A] border-[#334155] text-white'}`}
+                                    />
+                                </label>
+                                <label className="text-xs font-bold">
+                                    Declared batch weight (kg)
+                                    <input
+                                        required
+                                        type="number"
+                                        min="0.1"
+                                        step="0.1"
+                                        value={qualityBatch.weightKg}
+                                        onChange={e => setQualityBatch(previous => ({ ...previous, weightKg: e.target.value }))}
+                                        placeholder="e.g. 40"
+                                        className={`mt-1 w-full rounded-xl border px-3 py-2 outline-none font-medium focus:border-blue-500 ${theme === 'light' ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A]' : 'bg-[#0F172A] border-[#334155] text-white'}`}
+                                    />
+                                </label>
+                            </div>
+
+                            <fieldset className="space-y-3">
+                                <legend className="text-xs font-black uppercase">Inspection checks</legend>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {SURI_QUALITY_CHECKS.map(check => (
+                                        <label
+                                            key={check.key}
+                                            className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition ${qualityChecklist[check.key]
+                                                ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40'
+                                                : theme === 'light' ? 'border-[#CBD5E1] bg-[#F8FAFC]' : 'border-[#334155] bg-[#0F172A]'
+                                                }`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={qualityChecklist[check.key]}
+                                                onChange={e => setQualityChecklist(previous => ({ ...previous, [check.key]: e.target.checked }))}
+                                                className="mt-0.5 h-4 w-4 accent-emerald-600"
+                                            />
+                                            <span>
+                                                <span className="block text-xs font-black">{check.title}</span>
+                                                <span className="block mt-1 text-[11px] opacity-75">{check.description}</span>
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </fieldset>
+
+                            {/* Multi-angle Proof Review: Interactive Photo Upload Area */}
+                            <div className={`p-4 rounded-xl border space-y-3 ${theme === 'light' ? 'bg-[#F8FAFC] border-[#CBD5E1]' : 'bg-[#0F172A] border-[#334155]'}`}>
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div>
+                                        <div className="text-xs font-black uppercase flex items-center gap-2">
+                                            <Camera className="w-4 h-4 text-[#2563EB] dark:text-[#93C5FD]" />
+                                            <span>Multi-angle Proof Review: Dockside Inspection Photo</span>
+                                        </div>
+                                        <p className="text-[11px] opacity-75 mt-0.5">
+                                            Upload dockside evidence from the top, middle, and bottom of the bañera to verify anti-layering.
+                                        </p>
+                                    </div>
+                                    {photoPreview && (
+                                        <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                            <CheckCircle2 className="w-3.5 h-3.5" /> Proof Photo Attached
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                                    {/* Upload Trigger & Fallback URL */}
+                                    <div className="space-y-3">
+                                        <label className={`flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer transition text-center ${photoPreview
+                                            ? 'border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20'
+                                            : theme === 'light'
+                                                ? 'border-[#CBD5E1] hover:border-[#2563EB] bg-white'
+                                                : 'border-[#334155] hover:border-[#3B82F6] bg-[#1E293B]'
+                                            }`}>
+                                            <Upload className="w-6 h-6 text-[#2563EB] dark:text-[#93C5FD] mb-1.5" />
+                                            <span className="text-xs font-bold">Choose / Take Dockside Photo</span>
+                                            <span className="text-[10px] opacity-70 mt-0.5">Click to browse file or snap picture</span>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handlePhotoFileChange}
+                                                className="hidden"
+                                            />
+                                        </label>
+
+                                        <div>
+                                            <label className="text-[11px] font-bold block mb-1">
+                                                Or Fallback Photo URL:
+                                            </label>
+                                            <input
+                                                type="url"
+                                                value={qualityBatch.photoUrl}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setQualityBatch(prev => ({ ...prev, photoUrl: val }));
+                                                    setPhotoPreview(val);
+                                                    if (val.trim()) {
+                                                        setQualityChecklist(prev => ({ ...prev, photoProof: true }));
+                                                    }
+                                                }}
+                                                placeholder="https://... (default high-res seafood image attached if empty)"
+                                                className={`w-full text-xs rounded-xl px-3 py-2 border outline-none font-medium ${theme === 'light' ? 'bg-white border-[#CBD5E1] text-[#0F172A]' : 'bg-[#1E293B] border-[#334155] text-white'}`}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Visual Image Preview */}
+                                    <div className={`p-3 rounded-xl border flex flex-col items-center justify-center min-h-[148px] relative ${theme === 'light' ? 'bg-white border-[#CBD5E1]' : 'bg-[#1E293B] border-[#334155]'}`}>
+                                        {photoPreview ? (
+                                            <div className="relative w-full h-36 rounded-lg overflow-hidden border border-[#CBD5E1] dark:border-[#334155] bg-slate-900">
+                                                <img
+                                                    src={photoPreview}
+                                                    alt="Multi-angle proof preview"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setPhotoPreview('');
+                                                        setQualityBatch(prev => ({ ...prev, photoFile: null, photoUrl: '' }));
+                                                    }}
+                                                    className="absolute top-2 right-2 p-1 bg-black/70 hover:bg-black text-white rounded-lg transition"
+                                                    title="Remove uploaded photo"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                                <span className="absolute bottom-2 left-2 px-2 py-0.5 bg-black/75 text-emerald-300 text-[10px] font-bold rounded">
+                                                    ✓ Multi-angle Proof Preview
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-1.5 py-4 text-center">
+                                                <ImageIcon className="w-8 h-8 mx-auto text-slate-400 opacity-60" />
+                                                <div className="text-xs font-bold opacity-75">No Photo Uploaded</div>
+                                                <div className="text-[10px] opacity-60 max-w-xs">
+                                                    If omitted, a verified high-resolution seafood inspection photo is automatically attached upon submission.
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
                             <button
-                                onClick={() => showToast("🛡️ Suri-Isda Certification signed! Bañera batch approved for auction.")}
-                                className="px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs uppercase rounded-xl shadow transition"
+                                type="submit"
+                                className="w-full sm:w-auto px-5 py-2.5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-black text-xs uppercase rounded-xl shadow transition"
                             >
-                                Validate New Bañera Batch
+                                Record validation
                             </button>
-                        </div>
+                        </form>
+
+                        <section className={`p-5 rounded-2xl border space-y-3 ${theme === 'light' ? 'bg-[#FFFFFF] border-[#CBD5E1]' : 'bg-[#1E293B] border-[#334155]'}`}>
+                            <div className="flex items-center justify-between gap-3">
+                                <h3 className="font-black text-sm uppercase text-[#1D396B] dark:text-white">Recent validation records</h3>
+                                <span className="text-[10px] font-bold opacity-70">{qualityValidations.length} recorded</span>
+                            </div>
+                            {qualityValidations.length === 0 ? (
+                                <p className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 px-4 py-6 text-center text-xs opacity-70">
+                                    No batches validated in this session yet.
+                                </p>
+                            ) : (
+                                <div className="space-y-2.5">
+                                    {qualityValidations.map(validation => (
+                                        <article key={validation.id} className={`rounded-xl border p-3.5 flex flex-col sm:flex-row gap-3.5 items-start sm:items-center ${theme === 'light' ? 'border-[#E2E8F0] bg-[#F8FAFC]' : 'border-[#334155] bg-[#0F172A]'}`}>
+                                            {validation.photoUrl && (
+                                                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden border border-[#CBD5E1] dark:border-[#334155] flex-shrink-0 bg-slate-900 shadow-sm">
+                                                    <img
+                                                        src={validation.photoUrl}
+                                                        alt={validation.fishName || validation.species}
+                                                        className="w-full h-full object-cover"
+                                                        onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1519708227418-c8fd9a32b7a2?auto=format&fit=crop&w=800&q=80'; }}
+                                                    />
+                                                </div>
+                                            )}
+                                            <div className="flex-1 w-full">
+                                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                                    <div>
+                                                        <p className="text-xs font-black">
+                                                            {validation.batchId} · <span className="text-[#2563EB] dark:text-[#93C5FD]">{validation.fishName}</span> {validation.species !== validation.fishName && `(${validation.species})`} · {validation.weightKg} kg
+                                                        </p>
+                                                        <p className="mt-1 text-[10px] opacity-70">{validation.validator} · {validation.timestamp} · {validation.id}</p>
+                                                    </div>
+                                                    <span className={`w-fit rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${validation.approved
+                                                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-400'
+                                                        : 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-400'
+                                                        }`}>
+                                                        {validation.approved ? 'Validated' : 'Flagged for review'}
+                                                    </span>
+                                                </div>
+                                                {!validation.approved && (
+                                                    <p className="mt-2 text-[11px] text-amber-800 dark:text-amber-300">
+                                                        Incomplete checks: {validation.failedChecks.join(', ')}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </article>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
 
                     </div>
                 )}
@@ -1821,6 +2163,315 @@ export default function App() {
                             <Lock className="w-4 h-4" />
                             <span>Confirm & Generate Escrow QR Pass</span>
                         </button>
+
+                    </div>
+                </div>
+            )}
+
+            {/* ======================================================== */}
+            {/* PIER CHECKER INCOMING CATCH ENTRY MODAL                  */}
+            {/* ======================================================== */}
+            {showIncomingCatchModal && (
+                <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
+                    <div className={`w-full max-w-2xl rounded-2xl border p-6 space-y-5 shadow-2xl relative my-8 ${theme === 'light'
+                        ? 'bg-[#FFFFFF] border-[#1D396B] text-[#0F172A]'
+                        : 'bg-[#1E293B] border-[#3B82F6] text-white'
+                        }`}>
+
+                        <button
+                            onClick={() => setShowIncomingCatchModal(false)}
+                            className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-lg transition"
+                            title="Close modal"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+
+                        {/* Modal Header */}
+                        <div>
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-black uppercase mb-1.5 shadow-sm">
+                                <Anchor className="w-3.5 h-3.5" />
+                                <span>Pier Checker Dockside Intake Portal</span>
+                            </div>
+                            <h3 className="text-xl font-black uppercase font-mono tracking-wide text-[#1D396B] dark:text-white">
+                                Log Incoming Raw Catch
+                            </h3>
+                            <p className="text-xs opacity-80 mt-0.5">
+                                Enter landed raw fish consignment details. Catches are immediately published to the live Fresh Catches auction floor.
+                            </p>
+                        </div>
+
+                        {/* Form */}
+                        <form onSubmit={handleLogIncomingCatch} className="space-y-4 text-xs font-mono">
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                {/* Fish Common Name */}
+                                <div>
+                                    <label className="block font-bold mb-1">
+                                        Fish Common Name <span className="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={incomingCatchForm.name}
+                                        onChange={(e) => setIncomingCatchForm({ ...incomingCatchForm, name: e.target.value })}
+                                        placeholder="e.g. Galunggong (Round Scad)"
+                                        className={`w-full p-2.5 rounded-xl border outline-none font-bold ${theme === 'light'
+                                            ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A] focus:border-[#2563EB]'
+                                            : 'bg-[#0F172A] border-[#334155] text-white focus:border-[#3B82F6]'
+                                            }`}
+                                    />
+                                </div>
+
+                                {/* Local Term / Description */}
+                                <div>
+                                    <label className="block font-bold mb-1">
+                                        Local Term / Description <span className="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={incomingCatchForm.localTerm}
+                                        onChange={(e) => setIncomingCatchForm({ ...incomingCatchForm, localTerm: e.target.value })}
+                                        placeholder="e.g. Dagupan Blackfin Galunggong"
+                                        className={`w-full p-2.5 rounded-xl border outline-none font-bold ${theme === 'light'
+                                            ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A] focus:border-[#2563EB]'
+                                            : 'bg-[#0F172A] border-[#334155] text-white focus:border-[#3B82F6]'
+                                            }`}
+                                    />
+                                </div>
+
+                                {/* Scientific Name */}
+                                <div>
+                                    <label className="block font-bold mb-1">
+                                        Scientific Name <span className="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={incomingCatchForm.scientificName}
+                                        onChange={(e) => setIncomingCatchForm({ ...incomingCatchForm, scientificName: e.target.value })}
+                                        placeholder="e.g. Decapterus punctatus"
+                                        className={`w-full p-2.5 rounded-xl border outline-none italic font-bold ${theme === 'light'
+                                            ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A] focus:border-[#2563EB]'
+                                            : 'bg-[#0F172A] border-[#334155] text-white focus:border-[#3B82F6]'
+                                            }`}
+                                    />
+                                </div>
+
+                                {/* Category */}
+                                <div>
+                                    <label className="block font-bold mb-1">
+                                        Category <span className="text-rose-500">*</span>
+                                    </label>
+                                    <select
+                                        value={incomingCatchForm.category}
+                                        onChange={(e) => setIncomingCatchForm({ ...incomingCatchForm, category: e.target.value })}
+                                        className={`w-full p-2.5 rounded-xl border outline-none font-bold ${theme === 'light'
+                                            ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A]'
+                                            : 'bg-[#0F172A] border-[#334155] text-white'
+                                            }`}
+                                    >
+                                        <option value="Pelagic">Pelagic (Galunggong, Tuna, Salmon)</option>
+                                        <option value="Finfish">Finfish (Bangus, Maya-Maya)</option>
+                                        <option value="Freshwater">Freshwater (Tilapia, Hito)</option>
+                                        <option value="Crustacean">Crustacean (Sugpo, Alimango)</option>
+                                    </select>
+                                </div>
+
+                                {/* Quality Tier Rating */}
+                                <div>
+                                    <label className="block font-bold mb-1">
+                                        Quality Tier Rating <span className="text-rose-500">*</span>
+                                    </label>
+                                    <select
+                                        value={incomingCatchForm.qualityTier}
+                                        onChange={(e) => setIncomingCatchForm({ ...incomingCatchForm, qualityTier: e.target.value })}
+                                        className={`w-full p-2.5 rounded-xl border outline-none font-bold ${theme === 'light'
+                                            ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A]'
+                                            : 'bg-[#0F172A] border-[#334155] text-white'
+                                            }`}
+                                    >
+                                        <option value="Grade AAA Pier Fresh">Grade AAA Pier Fresh (Top Prime)</option>
+                                        <option value="Grade AAA Sashimi Quality">Grade AAA Sashimi Quality</option>
+                                        <option value="Grade AAA Export Prime">Grade AAA Export Prime</option>
+                                        <option value="Grade A Dockside Fresh">Grade A Dockside Fresh</option>
+                                        <option value="Grade AA Standard Tally">Grade AA Standard Tally</option>
+                                    </select>
+                                </div>
+
+                                {/* Total Weight in Bañera (kg) */}
+                                <div>
+                                    <label className="block font-bold mb-1">
+                                        Total Weight in Bañera (kg) <span className="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        required
+                                        min="1"
+                                        step="1"
+                                        value={incomingCatchForm.banyeraWeightKg}
+                                        onChange={(e) => setIncomingCatchForm({ ...incomingCatchForm, banyeraWeightKg: e.target.value })}
+                                        placeholder="e.g. 40"
+                                        className={`w-full p-2.5 rounded-xl border outline-none font-bold ${theme === 'light'
+                                            ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A]'
+                                            : 'bg-[#0F172A] border-[#334155] text-white'
+                                            }`}
+                                    />
+                                </div>
+
+                                {/* Available Bañeras */}
+                                <div>
+                                    <label className="block font-bold mb-1">
+                                        Available Bañeras (Tubs) <span className="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        required
+                                        min="1"
+                                        step="1"
+                                        value={incomingCatchForm.availableBanyeras}
+                                        onChange={(e) => setIncomingCatchForm({ ...incomingCatchForm, availableBanyeras: e.target.value })}
+                                        placeholder="e.g. 20"
+                                        className={`w-full p-2.5 rounded-xl border outline-none font-bold ${theme === 'light'
+                                            ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A]'
+                                            : 'bg-[#0F172A] border-[#334155] text-white'
+                                            }`}
+                                    />
+                                </div>
+
+                                {/* Wholesale Base Price per Kg (₱) */}
+                                <div>
+                                    <label className="block font-bold mb-1">
+                                        Wholesale Base Price per Kg (₱) <span className="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        required
+                                        min="1"
+                                        step="1"
+                                        value={incomingCatchForm.pricePerKg}
+                                        onChange={(e) => setIncomingCatchForm({ ...incomingCatchForm, pricePerKg: e.target.value })}
+                                        placeholder="e.g. 185"
+                                        className={`w-full p-2.5 rounded-xl border outline-none font-bold ${theme === 'light'
+                                            ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A]'
+                                            : 'bg-[#0F172A] border-[#334155] text-white'
+                                            }`}
+                                    />
+                                </div>
+
+                                {/* Starting Bid / Taripa Price per Kg (₱) */}
+                                <div>
+                                    <label className="block font-bold mb-1">
+                                        Starting Bid / Taripa Price per Kg (₱) <span className="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        required
+                                        min="1"
+                                        step="1"
+                                        value={incomingCatchForm.startingBidPerKg}
+                                        onChange={(e) => setIncomingCatchForm({ ...incomingCatchForm, startingBidPerKg: e.target.value })}
+                                        placeholder="e.g. 175"
+                                        className={`w-full p-2.5 rounded-xl border outline-none font-bold ${theme === 'light'
+                                            ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A]'
+                                            : 'bg-[#0F172A] border-[#334155] text-white'
+                                            }`}
+                                    />
+                                </div>
+
+                                {/* Pier / Dock Bay Landing Station */}
+                                <div>
+                                    <label className="block font-bold mb-1">
+                                        Pier / Dock Bay Landing Station <span className="text-rose-500">*</span>
+                                    </label>
+                                    <select
+                                        value={incomingCatchForm.landingStation}
+                                        onChange={(e) => setIncomingCatchForm({ ...incomingCatchForm, landingStation: e.target.value })}
+                                        className={`w-full p-2.5 rounded-xl border outline-none font-bold ${theme === 'light'
+                                            ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A]'
+                                            : 'bg-[#0F172A] border-[#334155] text-white'
+                                            }`}
+                                    >
+                                        <option value="Pier 1 Dock A">Pier 1 Dock A</option>
+                                        <option value="Pier 1 Bay A">Pier 1 Bay A</option>
+                                        <option value="Pier 2 Dock B">Pier 2 Dock B</option>
+                                        <option value="Pier 2 Bay A">Pier 2 Bay A</option>
+                                        <option value="Pier 3 Slipway">Pier 3 Slipway</option>
+                                    </select>
+                                </div>
+
+                                {/* Vessel of Origin */}
+                                <div className="sm:col-span-2">
+                                    <label className="block font-bold mb-1">
+                                        Vessel of Origin <span className="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={incomingCatchForm.vesselOrigin}
+                                        onChange={(e) => setIncomingCatchForm({ ...incomingCatchForm, vesselOrigin: e.target.value })}
+                                        placeholder="e.g. F/V San Miguel Navotas Carrier"
+                                        className={`w-full p-2.5 rounded-xl border outline-none font-bold ${theme === 'light'
+                                            ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A]'
+                                            : 'bg-[#0F172A] border-[#334155] text-white'
+                                            }`}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Catch Photo URL (Optional fallback) */}
+                            <div>
+                                <label className="block font-bold mb-1">
+                                    Catch Photo URL (Optional)
+                                </label>
+                                <input
+                                    type="url"
+                                    value={incomingCatchForm.photoUrl}
+                                    onChange={(e) => setIncomingCatchForm({ ...incomingCatchForm, photoUrl: e.target.value })}
+                                    placeholder="https://... (default high-res seafood image attached if blank)"
+                                    className={`w-full p-2.5 rounded-xl border outline-none font-medium ${theme === 'light'
+                                        ? 'bg-[#F8FAFC] border-[#CBD5E1] text-[#0F172A]'
+                                        : 'bg-[#0F172A] border-[#334155] text-white'
+                                        }`}
+                                />
+                            </div>
+
+                            {/* System Default Attributes Notice */}
+                            <div className={`p-3 rounded-xl border text-[11px] space-y-1 ${theme === 'light' ? 'bg-[#F8FAFC] border-[#CBD5E1]' : 'bg-[#0F172A] border-[#334155]'}`}>
+                                <div className="font-bold text-[#2563EB] dark:text-[#93C5FD] uppercase flex items-center gap-1.5">
+                                    <ShieldCheck className="w-3.5 h-3.5" />
+                                    <span>Automated DEAL Tally Engine Attributes:</span>
+                                </div>
+                                <div className="opacity-80 grid grid-cols-1 sm:grid-cols-2 gap-1 text-[10px]">
+                                    <div>• Auto Unique ID: CAT-00X series generated</div>
+                                    <div>• isAntiLayeredVerified: false (Requires Suri-Isda)</div>
+                                    <div>• poolAllocations: [] (Ready for micro-pooling)</div>
+                                    <div>• Tally Officer ID: {authCredentials.checkerId || 'TC-NAV-402'}</div>
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowIncomingCatchModal(false)}
+                                    className={`w-full sm:w-1/3 py-2.5 rounded-xl font-bold uppercase transition border ${theme === 'light'
+                                        ? 'border-slate-300 hover:bg-slate-100 text-slate-700'
+                                        : 'border-slate-600 hover:bg-slate-800 text-slate-300'
+                                        }`}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="w-full sm:w-2/3 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase rounded-xl transition shadow flex items-center justify-center gap-2"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    <span>Log & Prepend to Fresh Catches</span>
+                                </button>
+                            </div>
+
+                        </form>
 
                     </div>
                 </div>
