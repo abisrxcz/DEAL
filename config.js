@@ -1,0 +1,1 @@
+   window.DEAL_CONFIG = { url: "https://mafkwgasseifpfxmsilh.supabase.co/rest/v1/", key: "sb_publishable_9bUiqLBmFVACdJq6HVJQbQ_cKpBpNa8" };

@@ -1,15 +1,324 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BAGSAKAN EXPRESS - Navotas Fish Port Digital Consignment</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  </head>
-  <body class="bg-slate-950 text-slate-100 min-h-screen">
-    <div id="root"></div>
-    <script type="module" src="/main.jsx"></script>
-  </body>
-</html>
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>DEAL Navotas</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','sans-serif'],mono:['JetBrains Mono','monospace']}}}}</script>
+<style type="text/tailwindcss">
+@layer components{
+.badge{@apply text-xs font-mono uppercase px-2 py-0.5 rounded font-semibold inline-block}
+.btn{@apply w-full rounded-xl bg-[#006878] hover:bg-[#0B4A5D] text-white font-semibold py-3 text-sm disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed}
+.btn2{@apply rounded-xl border border-slate-300 bg-white font-semibold py-3 px-4 text-sm hover:bg-slate-50}
+.inp{@apply w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#006878]}
+.lbl{@apply block text-sm font-medium mb-1 mt-3}
+.card{@apply rounded-xl bg-white border border-slate-200 shadow-sm}
+.pill{@apply px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap hover:bg-slate-100}
+.pill.on{@apply bg-[#006878] text-white}}
+</style><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script><script src="config.js"></script><style>
+.dark{color-scheme:dark}.dark body{background:#0B0E17;color:#e2e8f0}
+.dark .bg-white,.dark .card,.dark .inp,.dark .btn2{background:#111827}
+.dark .bg-slate-50{background:#0B0E17}
+.dark .bg-slate-100,.dark .hover\:bg-slate-100:hover,.dark .hover\:bg-slate-50:hover{background:#1e293b}
+.dark .card,.dark .inp,.dark .btn2,.dark .border,.dark .border-t,.dark .border-b,.dark .border-2,.dark .border-slate-200,.dark .border-slate-300,.dark th,.dark td,.dark tr{border-color:#334155}
+.dark .inp,.dark .btn2{color:#e2e8f0}.dark select option{background:#111827}
+.dark .text-slate-500,.dark .text-slate-600,.dark .text-slate-700{color:#94a3b8}
+.dark .bg-teal-50{background:#0f2f36}.dark .bg-teal-100{background:#134e4a}.dark .text-teal-800{color:#99f6e4}
+.dark .bg-yellow-100,.dark .bg-amber-100,.dark .bg-amber-50{background:#422006}.dark .text-yellow-800,.dark .text-amber-800{color:#fde68a}
+.dark .bg-emerald-100{background:#064e3b}.dark .text-emerald-800{color:#a7f3d0}
+.dark .bg-sky-100{background:#0c4a6e}.dark .text-sky-800{color:#bae6fd}
+.dark .bg-blue-50{background:#172554}.dark .bg-red-100{background:#450a0a}.dark .text-red-800{color:#fecaca}
+.dark .text-\[\#0B4A5D\],.dark .text-\[\#006878\]{color:#5eead4}
+.dark .pill{color:#cbd5e1}.dark .pill.on{background:#006878;color:#fff}
+.dark .bg-\[\#006878\]{background:#006878;color:#fff}
+</style></head>
+<body class="bg-slate-50 text-slate-900 font-sans"><div id="app"></div><div id="toast" class="fixed top-4 right-4 z-50 space-y-2"></div>
+<script>
+const $=s=>document.querySelector(s),fmt=n=>'₱'+(+n).toLocaleString('en-PH',{maximumFractionDigits:2});
+const TABS={vendor:[['floor','Fresh Catches Floor'],['hati','Hati-Hati Banyera'],['taripa','Taripa Calculator'],['quality','Suri-Isda Guard'],['sync','Offline Sync'],['passes','Passes & Ledger']],
+checker:[['intake','Dockside Intake'],['quality','Validation Register'],['sync','Offline Sync']],
+broker:[['auction','Consignations & Bids'],['taripa','Taripa Calculator'],['passes','Escrow & Passes']]};
+const TAG={EN:'Pick fresh catch. Share the tub, not the quality.',TL:'Pumili ng sariwang huli. Hati sa bañera, hindi sa kalidad.',TAGLISH:'Pili sa sariwang huli. Hati-hati sa bañera, hindi kalidad.'};
+let LR='vendor',CAT='All';
+const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}};
+let S={user:null,role:null,tab:'floor',lang:LS('deal-lang','TAGLISH'),catches:LS('deal-cache',[]),passes:[],queue:LS('deal-q',[]),checks:[],sel:null,offline:false,dark:(localStorage.getItem('deal-dark')??(matchMedia('(prefers-color-scheme: dark)').matches?'1':'0'))==='1'};
+const save=()=>{try{localStorage.setItem('deal-q',JSON.stringify(S.queue));localStorage.setItem('deal-lang',JSON.stringify(S.lang));localStorage.setItem('deal-dark',S.dark?'1':'0');localStorage.setItem('deal-cache',JSON.stringify(S.catches.map(({photo,...r})=>r)))}catch(e){}};
+let sb,AM='in',fails=0,lockUntil=0,idle,ch;
+const esc=s=>String(s??'').replace(/[&<>"'`]/g,'');
+const online=()=>!S.offline&&navigator.onLine;
+const find=id=>S.catches.find(c=>c.id===id);
+const open=c=>c.kg-c.claimed;
+const tar=(p,kg)=>{const base=p*kg,port=2.5*kg,comm=base*.05,ice=1.5*kg,total=base+port+comm+ice;return{base,port,comm,ice,total,eff:kg?total/kg:0}};
+function toast(m,bad){const d=document.createElement('div');d.className='px-4 py-2 rounded-lg text-sm text-white shadow '+(bad?'bg-red-600':'bg-[#0B4A5D]');d.textContent=tr(m);$('#toast').append(d);setTimeout(()=>d.remove(),3500)}
+const vl=id=>($('#'+id)||{}).value||'';
+
+/* ---------- auth + data ---------- */
+const PIERS=['Pier 1 Bay A (Dagupan & GenSan Vessels)','Pier 2 Dock B','Pier 3 Slipway'];
+const LBL={vendor:['Mobile Phone Number','09XX-XXX-XXXX'],checker:['Tally Officer Badge ID','TC-NAV-###'],broker:['Broker Official License #','BKR-NAV-####']};
+function login(){return`<div class="fixed inset-0 bg-[#0B0E17]/70 flex items-center justify-center p-4 z-40 overflow-y-auto"><div class="card w-full max-w-md p-6">
+ <span class="badge bg-[#006878] text-white">Navotas Port Authority verified access</span>
+ <h2 class="font-mono font-bold text-xl mt-2">Sign In: DEAL Port Access</h2><p class="text-sm text-slate-500">Authorized sign-in for micro-vendors, checkers, and consignee brokers</p>
+ <div class="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-xl my-4">${[['vendor','Micro-Vendor'],['checker','Pier Checker'],['broker','Consignee Broker']].map(([r,l])=>`<button onclick="LR='${r}';render()" class="py-2 rounded-lg text-sm font-medium ${LR===r?'bg-[#006878] text-white':''}">${l}</button>`).join('')}</div>
+ ${sb?'':'<p class="text-sm bg-amber-50 border border-amber-300 rounded-lg p-3">Setup needed: add your Supabase URL and anon key to config.js.</p>'}
+ ${AM==='up'&&LR!=='vendor'?`<label class="lbl">Full name</label><input id="f0" class="inp" maxlength="80" autocomplete="name"><p class="text-xs text-slate-500 mt-2">We will create your ID for you when you finish.</p>`:`<label class="lbl">${LBL[LR][0]}</label><input id="f1" class="inp" placeholder="${LBL[LR][1]}" autocomplete="username">`}
+ <label class="lbl">Password</label><input id="f2" type="password" class="inp" autocomplete="${AM==='up'?'new-password':'current-password'}" placeholder="${AM==='up'?'8+ characters, letters and numbers':''}">
+ ${AM==='up'&&LR!=='vendor'?`<label class="lbl">${LR==='checker'?'Assigned Dockside Pier Station':'Pier Location'}</label><select id="f3" class="inp">${PIERS.map(x=>`<option>${x}</option>`).join('')}</select>`:''}
+ 
+ ${AM==='up'&&LR!=='vendor'?`<label class="lbl">Mobile Phone Number (optional)</label><input id="f5" class="inp" placeholder="09XX-XXX-XXXX" autocomplete="tel">`:''}
+ <div class="text-xs text-[#006878] flex justify-between my-3 font-medium"><span>TLS 1.3 / AES-256 encrypted</span><span>Auto sign-out after 15 min idle</span></div>
+ <button class="btn" onclick="doLogin()">${AM==='in'?{vendor:'ENTER MICRO-VENDOR PORTAL',checker:'ENTER PIER CHECKER PORTAL',broker:'ENTER BROKER PORTAL'}[LR]:'CREATE ACCOUNT'}</button>
+ 
+ <button class="w-full text-sm text-[#006878] font-semibold mt-3" onclick="AM=AM==='in'?'up':'in';render()">${AM==='in'?'New here? Create an account':'Have an account? Sign in'}</button></div></div>`}
+async function doLogin(){
+ if(!sb)return toast('Add your Supabase URL and anon key to config.js first.',1);
+ const wait=Math.ceil((lockUntil-Date.now())/1000);if(wait>0)return toast(`Too many attempts. Try again in ${wait}s.`,1);
+ if(AM==='up'&&LR!=='vendor')return staffSignup();
+ const a=vl('f1').trim(),p=vl('f2'),re={vendor:/^09\d{2}-?\d{3}-?\d{4}$/,checker:/^TC-NAV-\d+$/i,broker:/^BKR-NAV-\d+$/i}[LR];
+ if(!re.test(a))return toast(`Enter a valid ${LBL[LR][0]} (${LBL[LR][1]}).`,1);
+ if(AM==='up'&&(p.length<8||!/\d/.test(p)||!/[a-z]/i.test(p)))return toast('Password needs 8+ characters with letters and numbers.',1);
+ const email=a.replace(/-/g,'').toLowerCase()+'@deal-navotas.app';
+ if(AM==='up'){
+  const need=LR!=='vendor';if(need&&!vl('f4').trim())return toast('Enter your personal PIN.',1);
+  let r=await sb.auth.signUp({email,password:p});
+  if(r.error&&/regist/i.test(r.error.message))r=await sb.auth.signInWithPassword({email,password:p});
+  if(r.error||!r.data.session)return toast(r.error?'That ID is already registered. Try signing in.':'Sign-up needs "Confirm email" turned off in Supabase.',1);
+  const ex=await sb.from('profiles').select('id').maybeSingle();
+  if(!ex.data){const row={id:r.data.user.id,role:LR,approved:true,ident:a.toUpperCase(),station:LR==='checker'?vl('f3'):null};
+   const q=need?await sb.rpc('claim_identity',{p_role:LR,p_ident:a,p_station:LR==='checker'?vl('f3'):null,p_pin:vl('f4').trim()}):await sb.from('profiles').insert(row);
+   if(q.error||(need&&q.data!=='ok')){await sb.auth.signOut();return toast(q.data==='locked'?'Too many wrong PIN attempts. Contact the pilot admin.':q.data==='denied'?'This ID or PIN is not recognized. Contact the pilot admin.':/duplicate|already/i.test((q.error&&q.error.message)||'')?'This ID already has an account. Try signing in.':'Could not create the profile. Check your ID format and try again.',1)}}
+  AM='in';await enter(LR);return}
+ const{error}=await sb.auth.signInWithPassword({email,password:p});
+ if(error){if(++fails>=5){fails=0;lockUntil=Date.now()+60000}return toast('Wrong ID or password.',1)}
+ fails=0;await enter(LR)}
+async function staffSignup(){
+ const name=vl('f0').trim(),p=vl('f2'),st=vl('f3'),ph=vl('f5').trim();
+ if(name.length<3)return toast('Enter your full name.',1);
+ if(ph&&!/^09\d{2}-?\d{3}-?\d{4}$/.test(ph))return toast('Enter a valid Mobile Phone Number (09XX-XXX-XXXX).',1);
+ if(p.length<8||!/\d/.test(p)||!/[a-z]/i.test(p))return toast('Password needs 8+ characters with letters and numbers.',1);
+ const{data:id,error:e1}=await sb.rpc('new_badge',{p_role:LR});if(e1||!id)return toast(e1?'Could not create your ID: '+e1.message:'Could not create your ID. Try again.',1);
+ const r=await sb.auth.signUp({email:id.replace(/-/g,'').toLowerCase()+'@deal-navotas.app',password:p});
+ if(r.error||!r.data.session)return toast(r.error?r.error.message:'Sign-up needs "Confirm email" turned off in Supabase.',1);
+ const q=await sb.rpc('create_staff_profile',{p_role:LR,p_ident:id,p_name:name,p_station:st,p_phone:ph||null});
+ if(q.error){await sb.auth.signOut();return toast('Could not create the profile. Try again.',1)}
+ S.newId=id;AM='in';await enter(LR)}
+async function enter(want){
+ const{data:{user}}=await sb.auth.getUser();if(!user)return false;
+ const{data:p}=await sb.from('profiles').select('*').eq('id',user.id).maybeSingle();
+ if(!p||!p.approved||(want&&p.role!==want)){await sb.auth.signOut();toast(!p?'No profile found for this account.':!p.approved?'Account is awaiting admin approval.':'This account is not registered for this portal.',1);return false}
+ S.user=p.ident;S.role=p.role;S.station=p.station||'Pier 1-3';S.tab=TABS[p.role][0][0];
+ await load(1);ch=sb.channel('deal').on('postgres_changes',{event:'*',schema:'public'},()=>load(1)).subscribe();bump();render();return true}
+async function logout(){try{await sb.auth.signOut();if(ch)sb.removeChannel(ch)}catch(e){}S.user=null;S.catches=[];S.passes=[];S.checks=[];render()}
+const bump=()=>{clearTimeout(idle);if(S.user)idle=setTimeout(async()=>{await logout();toast('Signed out after 15 minutes idle.')},9e5)};
+['click','keydown','touchstart'].forEach(e=>addEventListener(e,bump,{passive:true}));
+async function load(q){
+ const[c,p,k]=await Promise.all([sb.from('catches').select('*').order('id'),sb.from('passes').select('*').order('created_at',{ascending:false}),sb.from('checks').select('id,cid,name,res,by_name,created_at').order('created_at',{ascending:false}).limit(50)]);
+ if(c.error)return toast('Could not load data. Showing the last saved copy.',1);
+ const old=Object.fromEntries(S.catches.map(x=>[x.id,x]));
+ S.catches=c.data.map(x=>{x.hist=(old[x.id]&&old[x.id].hist)||[];if(old[x.id]&&old[x.id].bid!==x.bid)x.hist.push(`${new Date().toLocaleTimeString()} · ${fmt(x.bid)}/kg`);['name','sci','cat','grade','src'].forEach(f=>x[f]=esc(x[f]));if(!/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(x.photo||''))x.photo=null;return x});
+ S.passes=(p.data||[]).map(x=>({...x,name:esc(x.name),t:new Date(x.created_at).toLocaleString()}));
+ S.checks=(k.data||[]).map(x=>({id:x.cid,name:esc(x.name),res:x.res,by:esc(x.by_name),t:new Date(x.created_at).toLocaleString(),rid:Number(x.id)}));
+ if(!find(S.sel))S.sel=S.catches[0]&&S.catches[0].id;
+ if(!q||(!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)&&!(S.role==='checker'&&S.tab==='intake')))render()}
+
+/* ---------- shell ---------- */
+const dm=()=>`<button onclick="S.dark=!S.dark;render()" class="text-xs border rounded-lg px-2 py-1.5">${S.dark?'Light mode':'Dark mode'}</button>`;
+const lg=()=>`<div class="flex rounded-lg border overflow-hidden text-xs font-mono">${['EN','TL','TAGLISH'].map(l=>`<button onclick="S.lang='${l}';render()" class="px-2 py-1.5 ${S.lang===l?'bg-[#0B4A5D] text-white':''}">${l}</button>`).join('')}</div>`;
+const idModal=()=>S.newId?`<div class="fixed inset-0 bg-[#0B0E17]/70 flex items-center justify-center p-4 z-50"><div class="card w-full max-w-sm p-6 text-center"><h2 class="font-mono font-bold text-xl">Account created!</h2><p class="text-sm text-slate-500 mt-1">Your ID is</p><div class="font-mono text-3xl font-bold text-[#006878] my-3 select-all">${S.newId}</div><p class="text-sm">Save it now. You will use this ID and your password to sign in.</p><button class="btn mt-4" onclick="S.newId=null;render()">Got it</button></div></div>`:'';
+function head(){return`<div class="bg-[#0B4A5D] text-white text-xs font-mono px-4 py-2 overflow-x-auto whitespace-nowrap">NAVOTAS PIER 1-3 → DIVISORIA → SUKI PALENGKE · VERIFIED PORT ESCROW</div>
+<header class="bg-white border-b"><div class="max-w-6xl mx-auto p-4 flex flex-wrap items-center gap-3 justify-between">
+<div><span class="font-mono font-bold text-2xl text-[#0B4A5D]">DEAL</span> <span class="text-xs text-slate-500">NAVOTAS</span></div>
+${S.user?`<div class="text-sm"><b>${S.role==='vendor'?'Micro-Vendor':S.role==='checker'?'Pier Checker':'Consignee Broker'}</b><br><span class="text-slate-500 text-xs">${S.user} · ${S.station}</span></div>
+<div class="flex items-center gap-2">${dm()}<button onclick="S.offline=!S.offline;render()" class="badge ${online()?'bg-emerald-100 text-emerald-800':'bg-amber-100 text-amber-800'}">${online()?'● Online':'● Offline'}</button>
+<div class="flex rounded-lg border overflow-hidden text-xs font-mono">${['EN','TL','TAGLISH'].map(l=>`<button onclick="S.lang='${l}';render()" class="px-2 py-1.5 ${S.lang===l?'bg-[#0B4A5D] text-white':''}">${l}</button>`).join('')}</div>
+<button onclick="logout()" class="text-sm text-[#006878] font-semibold">Switch portal ↗</button></div>`:`<span class="text-sm text-slate-500 hidden sm:block">Digital Consignation System for Fisheries & Seafood Trade</span><div class="flex gap-2 items-center">${dm()}${lg()}</div>`}</div></header>`}
+function nav(){const t=TABS[S.role];return`<nav class="hidden md:block bg-white border-b"><div class="max-w-6xl mx-auto p-2 flex gap-1 overflow-x-auto">${t.map(([k,l])=>`<button class="pill ${S.tab===k?'on':''}" onclick="S.tab='${k}';render()">${l}${k==='sync'&&S.queue.length?` (${S.queue.length})`:''}</button>`).join('')}</div></nav>`}
+const bottom=()=>`<nav class="md:hidden fixed bottom-0 inset-x-0 bg-white border-t flex overflow-x-auto z-30" style="padding-bottom:env(safe-area-inset-bottom,0px)">${TABS[S.role].map(([k,l])=>`<button onclick="S.tab='${k}';render()" class="flex-1 min-w-[84px] py-3 text-[11px] font-medium ${S.tab===k?'text-[#006878] border-t-2 border-[#006878]':'text-slate-500'}">${l}</button>`).join('')}</nav>`;
+const h1=(a,b)=>`<div class="mb-4"><h1 class="font-mono font-bold text-2xl">${a}</h1><p class="text-sm text-slate-600">${b}</p></div>`;
+
+/* ---------- vendor ---------- */
+function cardC(c,vend){const o=open(c),p=c.claimed/c.kg*100;
+ return`<article class="card overflow-hidden"><div class="h-44 bg-gradient-to-br from-[#0B4A5D] to-[#006878] p-3 flex justify-between"${c.photo?` style="background:url(${c.photo}) center/cover"`:''}><span class="badge bg-sky-100 text-sky-800 h-fit">${c.fresh}/10 Fresh</span><span class="font-mono text-xs text-white/80">${c.id}</span></div>
+<div class="p-4"><div class="flex justify-between"><span class="badge ${c.verified?'bg-teal-100 text-teal-800':'bg-yellow-100 text-yellow-800'}">${c.verified?'Suri-Isda verified':'Pending audit'}</span><span class="text-xs text-slate-500">${c.cat}</span></div>
+<h3 class="font-semibold text-lg mt-2">${c.name}</h3><p class="text-xs italic text-slate-500">${c.sci}</p><p class="font-mono text-xs mt-1">GRADE ${c.grade.toUpperCase()}</p>
+<div class="flex justify-between items-end my-2"><div><span class="font-mono text-2xl font-bold">${fmt(c.price)}/kg</span><div class="text-xs text-slate-500">${c.src}</div></div><div class="text-right text-sm font-mono">${c.kg} kg / tub<br><span class="text-slate-500 text-xs">${c.tubs} tubs available</span></div></div>
+<div class="text-xs flex justify-between"><b>Hati-Hati Bañera</b><span>${c.claimed}/${c.kg} kg</span></div><div class="h-2 bg-slate-200 rounded mt-1"><div class="h-2 bg-[#006878] rounded" style="width:${p}%"></div></div>
+<div class="text-xs flex justify-between text-slate-500 mt-1"><span>${c.claimed} kg claimed</span><span>${o} kg open</span></div>
+${vend?`<button class="btn mt-3" ${o<=0||!c.verified?'disabled':''} onclick="claim('${c.id}')">${!c.verified?'Awaiting Suri-Isda check':o<=0?'Fully claimed':'+ Claim Portion (Hati-Hati)'}</button>`:''}</div></article>`}
+function floor(hati){const cats=['All',...new Set(S.catches.map(c=>c.cat))];let l=S.catches.filter(c=>CAT==='All'||c.cat===CAT);if(hati)l=l.filter(c=>c.claimed>0&&open(c)>0);
+ return h1(hati?'Hati-Hati Banyera':'Fresh Catches Floor',TAG[S.lang])+`<div class="flex gap-2 overflow-x-auto mb-4">${cats.map(x=>`<button class="pill border ${CAT===x?'on':''}" onclick="CAT='${x}';render()">${x}${x==='All'?' · '+S.catches.length:''}</button>`).join('')}</div>
+ <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">${l.map(c=>cardC(c,1)).join('')||'<p class="text-slate-500">No portions are open right now. Check the Fresh Catches Floor.</p>'}</div>`}
+function claim(id){const c=find(id),o=open(c),kg=parseFloat(prompt(tr(`How many kg to claim? (${o} kg open)`),Math.min(10,o)));
+ if(!kg||kg<=0||kg>o)return toast(`Enter an amount from 1 to ${o} kg.`,1);
+ if(online())doClaim(id,kg);else{S.queue.push({sid:'SYNC-'+Date.now().toString(36).slice(-4).toUpperCase(),id,kg,t:new Date().toLocaleTimeString()});toast('Offline: claim saved on this device. Sync when online.');render()}}
+async function doClaim(id,kg){const{error}=await sb.rpc('claim_portion',{p_cid:id,p_kg:kg});if(error)return toast(error.message,1);toast('Portion claimed.');load(1)}
+async function syncNow(){if(!online())return toast('Still offline. Reconnect to sync.',1);const q=S.queue;S.queue=[];let ok=0;for(const x of q){const{error}=await sb.rpc('claim_portion',{p_cid:x.id,p_kg:x.kg});if(error)toast(`${x.sid}: ${error.message}`,1);else ok++}toast(`${ok} of ${q.length} transaction(s) synced.`);load(1)}
+function syncV(){return h1('Offline Sync Engine','Transactions made without signal are stored here until you sync.')+(S.queue.length?S.queue.map(q=>`<div class="card p-4 mb-3"><span class="badge bg-yellow-100 text-yellow-800">Stored locally</span><div class="font-mono text-sm mt-1">${q.sid} · ${q.kg} kg ${(find(q.id)||{}).name} · ${q.t}</div></div>`).join('')+`<button class="btn" onclick="syncNow()">Sync pending transactions</button>`:`<p class="text-slate-500">Nothing pending. Tap the status badge in the header to simulate offline.</p>`)}
+function passes(){const tot=S.passes.reduce((a,p)=>a+p.total,0),esc=S.passes.filter(p=>p.status==='escrow');
+ return h1('My Passes & Ledger',`${S.passes.length} passes · ${fmt(tot)} total · ${esc.length} in escrow`)+(S.passes.map(p=>`<div class="card p-4 mb-3 flex flex-wrap justify-between gap-3 items-center"><div><div class="font-mono text-xs text-slate-500">${p.id}</div><b>${p.name}</b><div class="text-sm">${p.kg} kg · ${fmt(p.total)} · ${p.t}</div></div>
+ <div class="text-right"><span class="badge ${p.status==='escrow'?'bg-yellow-100 text-yellow-800':'bg-teal-100 text-teal-800'}">${p.status==='escrow'?'Escrow held':'Released'}</span>${S.role==='broker'&&p.status==='escrow'?`<br><button class="btn2 mt-2 !py-1.5" onclick="release('${p.id}')">Approve escrow release</button>`:''}</div></div>`).join('')||'<p class="text-slate-500">No passes yet. Claim a portion on the Fresh Catches Floor.</p>')}
+async function release(id){const{error}=await sb.rpc('release_escrow',{p_id:id});if(error)return toast(error.message,1);toast('Escrow released.');load(1)}
+
+/* ---------- taripa ---------- */
+function taripaV(){const c=find(S.sel)||S.catches[0];return h1('Taripa Calculator','Transparent receipt. Estimate only, not a statement of independently verified law.')+`<div class="card p-5 max-w-lg"><label class="lbl !mt-0">Catch</label><select id="tc" class="inp" onchange="S.sel=this.value;calc()">${S.catches.map(x=>`<option value="${x.id}" ${x.id===c.id?'selected':''}>${x.name}</option>`).join('')}</select><label class="lbl">Weight (kg)</label><input id="tk" type="number" min="1" value="${c.kg}" class="inp" oninput="calc()"><div id="tr" class="mt-4"></div></div>`}
+function calc(){const c=find(vl('tc')),kg=+vl('tk')||0,t=tar(c.price,kg),r=(a,b)=>`<div class="flex justify-between py-1.5 border-b text-sm"><span>${a}</span><b class="font-mono">${fmt(b)}</b></div>`;
+ $('#tr').innerHTML=r(`Base fish price (${fmt(c.price)} × ${kg} kg)`,t.base)+r('Port fee (₱2.50/kg)',t.port)+r('Consignee commission (5%)',t.comm)+r('Ice / tub handling',t.ice)+`<div class="flex justify-between pt-3 text-lg font-bold"><span>Total payable</span><span class="font-mono">${fmt(t.total)}</span></div><div class="text-right text-sm text-[#006878] font-mono">Effective ${fmt(t.eff)}/kg</div>`;trDom($('#tr'))}
+
+/* ---------- checker ---------- */
+const F=(n,l,v,t='text')=>`<div><label class="lbl">${l} *</label><input name="${n}" type="${t}" placeholder="e.g. ${v}" class="inp"></div>`;
+function intake(){const sel=(n,l,o)=>`<div><label class="lbl">${l} *</label><select name="${n}" class="inp">${o.map(x=>`<option>${x}</option>`).join('')}</select></div>`;
+ return h1('Dockside Intake & Inspection','Timbang. Suri. Tala. Physical checks first, verify after.')+`<div class="bg-[#0B0E17] text-white rounded-xl p-4 mb-4 font-mono text-sm">ASSIGNED STATION: ${S.station} · Tally officer ${S.user}</div>
+<div class="grid lg:grid-cols-2 gap-4 items-start"><form class="card p-5" onsubmit="logCatch(event)"><h2 class="font-mono font-bold text-lg">Log Incoming Catch</h2><span class="badge bg-yellow-100 text-yellow-800">Pending physical audit</span>
+${F('name','Common name','Galunggong (Round Scad)')}${F('local','Local / trade name','Dagupan Blackfin Galunggong')}${F('sci','Scientific species','Decapterus punctatus')}
+<div class="grid grid-cols-2 gap-3">${sel('cat','Category',['Pelagic','Finfish','Freshwater','Crustacean'])}${sel('grade','Declared grade',['AAA Pier Fresh','AAA Export Prime','A Dockside Fresh'])}${F('kg','Tub weight (kg)',40,'number')}${F('tubs','Available tubs',15,'number')}${F('base','Wholesale base (₱/kg)',185,'number')}${F('start','Starting bid (₱/kg)',175,'number')}</div>
+${sel('station','Landing station',PIERS)}${F('vessel','Vessel / source','F/V San Miguel Navotas')}<label class="lbl">Catch photo (optional)</label><input id="ph" type="file" accept="image/*" class="inp" onchange="prev(this,'pv')"><img id="pv" class="hidden mt-2 rounded-lg max-h-40" alt=""><button class="btn mt-4">+ Log Incoming Catch</button></form>
+<div class="card p-5"><h2 class="font-mono font-bold text-lg">Suri-Isda Quality Guard</h2><span class="badge bg-yellow-100 text-yellow-800">Pending inspection</span>
+<label class="lbl">Batch / tub ID *</label><input id="qb" class="inp" placeholder="e.g. CAT-007" list="bl"><datalist id="bl">${S.catches.map(c=>`<option>${c.id}`).join('')}</datalist>
+${[['Bottom core sample','Inspect the bottom layer, not just the top.'],['Gill & eye freshness','Clear eyes, firm flesh, bright red gills.'],['Weight and species match','Match the actual catch to the declared species and weight.'],['Multi-angle proof reviewed','Review evidence from top, middle and bottom layers.']].map(([a,b])=>`<label class="flex gap-3 border rounded-lg p-3 mt-2 cursor-pointer"><input type="checkbox" class="chk mt-1"><span><b class="text-sm">${a}</b><br><span class="text-xs text-slate-500">${b}</span></span></label>`).join('')}
+<div class="grid grid-cols-3 gap-2 mt-3 text-xs text-center">${['Top','Middle','Bottom'].map((x,i)=>`<label class="relative border-2 border-dashed rounded-lg h-24 flex items-center justify-center cursor-pointer overflow-hidden"><span>${x} +</span><img id="evp${i}" class="hidden absolute inset-0 w-full h-full object-cover" alt=""><input id="ev${i}" type="file" accept="image/*" class="hidden" onchange="prev(this,'evp${i}')"></label>`).join('')}</div>
+<div class="flex gap-2 mt-4"><button class="btn2" onclick="validate(0)">Flag issue</button><button class="btn flex-1" onclick="validate(1)">Record validation</button></div></div></div>`}
+const shrink=(f,m=800,q=.75)=>new Promise(r=>{if(!f)return r(null);const i=new Image,u=URL.createObjectURL(f);i.onload=()=>{const k=Math.min(1,m/Math.max(i.width,i.height)),c=document.createElement('canvas');c.width=Math.round(i.width*k);c.height=Math.round(i.height*k);c.getContext('2d').drawImage(i,0,0,c.width,c.height);URL.revokeObjectURL(u);r(c.toDataURL('image/jpeg',q))};i.onerror=()=>r('ERR');i.src=u});
+function prev(inp,id){const f=inp.files[0],im=$('#'+id);if(!f){im.classList.add('hidden');return}im.onerror=()=>{toast('This photo could not be previewed. Use a JPG or PNG image.',1);im.classList.add('hidden')};im.src=URL.createObjectURL(f);im.classList.remove('hidden')}
+async function viewEv(id){const{data,error}=await sb.from('checks').select('*').eq('id',id).maybeSingle();if(error||!data)return toast('Could not load the evidence.',1);S.ev=data;render()}
+const evModal=()=>{const d=S.ev;if(!d)return'';const ok=u=>/^data:image\/jpeg;base64,[A-Za-z0-9+\/=]+$/.test(u||'');
+ const ph=[d.photo_top,d.photo_mid,d.photo_bot].map((u,i)=>ok(u)?`<div><img src="${u}" class="rounded-lg w-full h-28 object-cover" alt=""><div class="text-xs text-center mt-1">${['Top','Middle','Bottom'][i]}</div></div>`:'').join('');
+ return`<div class="fixed inset-0 bg-[#0B0E17]/70 flex items-center justify-center p-4 z-50 overflow-y-auto"><div class="card w-full max-w-lg p-5"><div class="font-mono text-xs text-slate-500">${esc(d.cid)} · ${esc(d.res)}</div><h2 class="font-semibold text-lg">${esc(d.name)}</h2>${ph?`<div class="grid grid-cols-3 gap-2 my-3">${ph}</div>`:'<p class="text-sm text-slate-500 my-3">No photos saved.</p>'}<button class="btn mt-4" onclick="S.ev=null;render()">Close</button></div></div>`};
+async function logCatch(e){e.preventDefault();const d=Object.fromEntries(new FormData(e.target));
+ if(['name','local','sci','kg','tubs','base','start','vessel'].some(k=>!String(d[k]).trim()))return toast('Fill in every required field before logging.',1);
+ if(+d.start>+d.base||+d.kg<=0||+d.tubs<=0)return toast('Check the numbers: starting bid cannot exceed the base, and values must be above 0.',1);
+ const f0=$('#ph').files[0];let photo=null;if(f0){photo=await shrink(f0,800,.75);if(photo==='ERR')return toast('This photo could not be read. Use a JPG or PNG image.',1)}
+ const id='CAT-'+String(Math.max(0,...S.catches.map(c=>+c.id.slice(4)))+1).padStart(3,'0');
+ const{error}=await sb.from('catches').insert({id,name:esc(d.local).slice(0,80),sci:esc(d.sci).slice(0,80),cat:d.cat,grade:d.grade,price:+d.base,start:+d.start,bid:+d.start,kg:+d.kg,tubs:+d.tubs,claimed:0,verified:false,src:esc(d.vessel).slice(0,60)+' · '+d.station,fresh:0,photo});
+ if(error)return toast(error.message,1);toast(`${id} logged. It's live on the Fresh Catches Floor as pending audit.`);await load()}
+async function validate(pass){const id=vl('qb').trim().toUpperCase(),c=find(id);if(!c)return toast('Batch ID not found. Enter or pick an existing CAT-### ID.',1);
+ const n=[...document.querySelectorAll('.chk')].filter(x=>x.checked).length;
+ if(pass&&n<4)return toast(`${n} of 4 checks confirmed. All four are required to pass.`,1);
+ const ev=await Promise.all([0,1,2].map(i=>shrink($('#ev'+i).files[0],1024,.78)));
+ if(ev.includes('ERR'))return toast('A photo could not be read. Use JPG or PNG images.',1);
+ const fr=pass&&!c.fresh?9:c.fresh;
+ const u=await sb.from('catches').update({verified:!!pass,fresh:fr}).eq('id',id);if(u.error)return toast(u.error.message,1);
+ const ci=await sb.from('checks').insert({cid:id,name:c.name,res:pass?'Passed':'Flagged',by_name:S.user,photo_top:ev[0],photo_mid:ev[1],photo_bot:ev[2]});
+ if(ci.error)return toast('Lot updated, but the record was not saved: '+ci.error.message,1);
+ toast(pass?`${id} passed Suri-Isda.`:`${id} flagged for review.`,!pass);load()}
+function register(){const pend=S.catches.filter(c=>!c.verified&&!S.checks.some(k=>k.id===c.id));
+ return h1('Validation Register','Recent intake records and inspection results.')+(S.checks.map(k=>`<div class="card p-4 mb-2 flex justify-between"><div><span class="font-mono text-xs">${k.id}</span> <b>${k.name}</b><div class="text-xs text-slate-500">${k.by} · ${k.t}</div><button class="text-xs text-[#006878] font-semibold mt-1" onclick="viewEv(${k.rid})">View evidence</button></div><span class="badge ${k.res==='Passed'?'bg-teal-100 text-teal-800':'bg-red-100 text-red-800'} h-fit">${k.res}</span></div>`).join('')+pend.map(c=>`<div class="card p-4 mb-2 flex justify-between items-center gap-3">${c.photo?`<img src="${c.photo}" class="w-16 h-16 rounded-lg object-cover" alt="">`:''}<div class="flex-1"><span class="font-mono text-xs">${c.id}</span> <b>${c.name}</b></div><span class="badge bg-yellow-100 text-yellow-800 h-fit">Pending audit</span></div>`).join('')||'<p class="text-slate-500">No validation records yet. Completed inspections appear here.</p>')}
+
+/* ---------- broker ---------- */
+function auction(){const v=S.catches.filter(c=>c.verified),c=find(S.sel)||S.catches[0],t=tar(c.bid,c.kg),
+ st=x=>!x.verified?['In Transit','bg-sky-100 text-sky-800']:S.passes.some(p=>p.cid===x.id&&p.status==='escrow')?['Escrow Locked','bg-yellow-100 text-yellow-800']:['Awaiting Auction','bg-slate-100 text-slate-700'];
+ return h1('Consignations & Live Bids','Watch bulk lots, see a clear Taripa, and keep payment held until inspection passes.')+`<div class="grid grid-cols-3 gap-3 mb-4">${[['Active lots',v.length],['Tubs in stock',S.catches.reduce((a,x)=>a+x.tubs,0)],['Live bids','● Live']].map(([a,b])=>`<div class="card p-4"><div class="text-xs font-mono text-slate-500">${a}</div><div class="font-mono text-2xl font-bold">${b}</div></div>`).join('')}</div>
+<div class="grid lg:grid-cols-2 gap-4 items-start"><div class="card overflow-x-auto"><table class="w-full text-sm"><thead class="text-xs font-mono text-left text-slate-500"><tr><th class="p-3">Batch</th><th>Volume</th><th>Top bid</th><th>Status</th></tr></thead><tbody>${S.catches.map(x=>{const s=st(x);return`<tr onclick="S.sel='${x.id}';render()" class="border-t cursor-pointer ${x.id===c.id?'bg-teal-50':'hover:bg-slate-50'}"><td class="p-3"><b class="font-mono">${x.id}</b><br><span class="text-xs">${x.name}</span></td><td>${x.kg}kg × ${x.tubs}</td><td class="font-mono">${fmt(x.bid)}</td><td><span class="badge ${s[1]}">${s[0]}</span></td></tr>`}).join('')}</tbody></table></div>
+<div class="card p-5">${c.photo?`<img src="${c.photo}" class="w-full h-44 object-cover rounded-lg mb-3" alt="">`:''}<div class="font-mono text-xs text-slate-500">SELECTED · ${c.id}</div><h2 class="font-semibold text-lg">${c.name}</h2><p class="text-xs italic">${c.sci} · ${c.src}</p>
+<div class="grid grid-cols-2 gap-3 my-3"><div class="bg-slate-100 rounded-lg p-3 text-sm">Starting<br><b class="font-mono text-lg">${fmt(c.start)}/kg</b></div><div class="bg-teal-50 border border-teal-200 rounded-lg p-3 text-sm">Current top bid<br><b class="font-mono text-lg">${fmt(c.bid)}/kg</b></div></div>
+<div class="grid grid-cols-2 gap-2"><button class="btn2" onclick="editStart('${c.id}')">Edit starting bid</button><button class="btn2" onclick="raiseBid('${c.id}')">+₱5 bid</button></div>
+<div class="mt-3 text-xs font-mono">BID HISTORY</div>${(c.hist.length?c.hist:['No new bids yet.']).slice(-5).reverse().map(h=>`<div class="text-sm py-1 border-b">${h}</div>`).join('')}
+<div class="mt-4 text-xs font-mono">TARIPA @ ${c.kg} KG, TOP BID</div>${[['Base fish price',t.base],['Port fee',t.port],['Commission (5%)',t.comm],['Ice / handling',t.ice]].map(([a,b])=>`<div class="flex justify-between text-sm py-1"><span>${a}</span><span class="font-mono">${fmt(b)}</span></div>`).join('')}<div class="flex justify-between font-bold border-t pt-2"><span>Total payable</span><span class="font-mono">${fmt(t.total)}</span></div></div></div>`}
+async function editStart(id){const c=find(id),v=parseFloat(prompt('New starting bid (₱/kg)',c.start));if(!v||v<=0)return toast('Enter a positive amount.',1);const{error}=await sb.from('catches').update({start:v,bid:Math.max(c.bid,v)}).eq('id',id);if(error)return toast(error.message,1);toast('Starting bid updated.');load(1)}
+async function raiseBid(id){const c=find(id),{error}=await sb.from('catches').update({bid:c.bid+5}).eq('id',id);if(error)return toast(error.message,1);load(1)}
+
+/* ---------- i18n (EN / TL / TAGLISH) ---------- */
+const D=[
+['Digital Consignation System for Fisheries & Seafood Trade','Digital na Sistema ng Konsignasyon para sa Isda at Lamang-dagat','Digital Consignation System para sa Isda at Seafood Trade'],
+['Micro-Vendor','Maliit na Tindero','Micro-Vendor'],['Pier Checker','Tagasuri sa Pantalan'],['Consignee Broker','Broker ng Konsignataryo'],
+['● Online','● Nakakonekta'],['● Offline','● Walang Koneksyon'],['Switch portal ↗','Lumipat ng portal ↗'],['Dark mode','Madilim na mode'],['Light mode','Maliwanag na mode'],
+['Navotas Port Authority verified access','Aprubado ng Navotas Port Authority','Verified ng Navotas Port Authority'],
+['Sign In: DEAL Port Access','Mag-sign In: DEAL Port Access'],
+['Authorized sign-in for micro-vendors, checkers, and consignee brokers','Awtorisadong pag-sign in para sa mga micro-vendor, tagasuri, at consignee broker','Authorized sign-in para sa micro-vendors, checkers, at consignee brokers'],
+['Mobile Phone Number','Numero ng Cellphone','Mobile Number'],['Tally Officer Badge ID','Badge ID ng Tally Officer'],['Broker Official License #','Opisyal na Lisensya ng Broker #'],
+['Assigned Dockside Pier Station','Nakatalagang Himpilan sa Pantalan','Assigned Pier Station'],
+['TLS 1.3 / AES-256 encrypted','Naka-encrypt ang TLS 1.3 / AES-256'],['Auto sign-out after 15 min idle','Awtomatikong sign-out pagkalipas ng 15 min na walang gamit','Auto sign-out pag 15 min na idle'],
+['ENTER MICRO-VENDOR PORTAL','PUMASOK SA PORTAL NG MICRO-VENDOR','PUMASOK SA MICRO-VENDOR PORTAL'],['ENTER PIER CHECKER PORTAL','PUMASOK SA PORTAL NG TAGASURI','PUMASOK SA PIER CHECKER PORTAL'],['ENTER BROKER PORTAL','PUMASOK SA PORTAL NG BROKER','PUMASOK SA BROKER PORTAL'],
+['CREATE ACCOUNT','GUMAWA NG ACCOUNT'],['New here? Create an account','Bago ka rito? Gumawa ng account','Bago ka dito? Create an account'],['Have an account? Sign in','May account na? Mag-sign in','May account na? Sign in na'],
+['Setup needed: add your Supabase URL and anon key to config.js.','Kailangan ng setup: ilagay ang Supabase URL at anon key sa config.js.','Setup muna: ilagay ang Supabase URL at anon key sa config.js.'],
+['Fresh Catches Floor','Palengke ng Sariwang Huli'],['Hati-Hati Banyera','Hati-Hati sa Banyera'],['Taripa Calculator','Kalkulador ng Taripa'],['Suri-Isda Guard','Bantay-Kalidad ng Isda'],['Offline Sync','Sync na Walang Net'],['Passes & Ledger','Mga Pass at Talaan'],
+['Dockside Intake','Pagtanggap sa Pantalan'],['Validation Register','Talaan ng Pagsusuri'],['Consignations & Bids','Konsignasyon at Taya'],['Escrow & Passes','Escrow at mga Pass'],
+['Pending audit','Hinihintay ang Pagsusuri'],['Suri-Isda verified','Napatunayan ng Suri-Isda','Suri-Isda Verified'],['Hati-Hati Bañera','Hati-Hati sa Bañera'],
+['Awaiting Suri-Isda check','Hinihintay ang Suri-Isda','Hinihintay ang Suri-Isda check'],['Fully claimed','Ubos na ang kuha','Fully claimed na'],['+ Claim Portion (Hati-Hati)','+ Kumuha ng Bahagi (Hati-Hati)'],
+['No portions are open right now. Check the Fresh Catches Floor.','Walang bukas na bahagi ngayon. Tingnan ang Palengke ng Sariwang Huli.','Walang open na portion ngayon. Check ang Fresh Catches Floor.'],
+['No catches yet','Wala pang huli','Wala pang catches'],['Waiting for a Pier Checker to log the first landing.','Hinihintay na itala ng Tagasuri sa Pantalan ang unang dating ng huli.','Hinihintay ang Pier Checker na i-log ang unang landing.'],
+['Transparent receipt. Estimate only, not a statement of independently verified law.','Malinaw na resibo. Pagtataya lamang ito, hindi opisyal na pahayag ng batas.','Transparent na resibo. Estimate lang ito, hindi legal statement.'],
+['Catch','Huli'],['Weight (kg)','Timbang (kg)'],['Port fee (₱2.50/kg)','Bayad sa pantalan (₱2.50/kg)'],['Consignee commission (5%)','Komisyon ng consignee (5%)'],['Ice / tub handling','Yelo / paghawak ng tub'],
+['Total payable','Kabuuang babayaran'],['Commission (5%)','Komisyon (5%)'],['Ice / handling','Yelo / paghawak'],['Base fish price','Batayang presyo ng isda'],['Port fee','Bayad sa pantalan'],
+['Offline Sync Engine','Makina ng Offline Sync'],['Transactions made without signal are stored here until you sync.','Ang mga transaksyong ginawa nang walang signal ay itatabi rito hanggang mag-sync ka.','Dito naka-save ang mga transaction na walang signal hanggang mag-sync ka.'],
+['Stored locally','Nakatabi sa device'],['Sync pending transactions','I-sync ang mga nakabinbing transaksyon','I-sync ang pending transactions'],
+['Nothing pending. Tap the status badge in the header to simulate offline.','Walang nakabinbin. Pindutin ang status badge sa itaas para subukan ang offline.','Walang pending. I-tap ang status badge sa header para i-test ang offline.'],
+['My Passes & Ledger','Aking mga Pass at Talaan'],['Escrow held','Naka-hold ang escrow'],['Released','Nailabas na'],['Approve escrow release','Aprubahan ang paglabas ng escrow'],
+['No passes yet. Claim a portion on the Fresh Catches Floor.','Wala pang pass. Kumuha ng bahagi sa Palengke ng Sariwang Huli.','Wala pang pass. Mag-claim ng portion sa Fresh Catches Floor.'],
+['Dockside Intake & Inspection','Pagtanggap at Pagsusuri sa Pantalan'],['Timbang. Suri. Tala. Physical checks first, verify after.','Timbangin. Suriin. Itala. Unahin ang pisikal na pagsusuri bago mag-verify.','Timbang. Suri. Tala. Physical check muna bago i-verify.'],
+['Log Incoming Catch','Itala ang Dumating na Huli','I-log ang Incoming Catch'],['+ Log Incoming Catch','+ Itala ang Dumating na Huli','+ I-log ang Incoming Catch'],['Pending physical audit','Hinihintay ang pisikal na pagsusuri'],
+['Common name *','Karaniwang pangalan *'],['Local / trade name *','Lokal / pangalang pangkalakal *'],['Scientific species *','Siyentipikong uri *'],['Category *','Kategorya *'],['Declared grade *','Ipinahayag na grado *'],
+['Tub weight (kg) *','Timbang ng tub (kg) *'],['Available tubs *','Mga tub na available *'],['Wholesale base (₱/kg) *','Batayang presyong pakyawan (₱/kg) *'],['Starting bid (₱/kg) *','Panimulang taya (₱/kg) *'],
+['Landing station *','Pantalan ng dating *'],['Vessel / source *','Sasakyang-dagat / pinagmulan *'],['Catch photo (optional)','Larawan ng huli (opsyonal)'],
+['Suri-Isda Quality Guard','Bantay-Kalidad Suri-Isda'],['Pending inspection','Hinihintay ang inspeksyon'],['Batch / tub ID *','Batch / ID ng tub *'],
+['Bottom core sample','Sample sa ilalim'],['Inspect the bottom layer, not just the top.','Suriin ang ilalim na patong, hindi lang ang ibabaw.','I-check ang bottom layer, hindi lang ang top.'],
+['Gill & eye freshness','Kasariwaan ng hasang at mata'],['Clear eyes, firm flesh, bright red gills.','Malinaw ang mata, matigas ang laman, matingkad na pula ang hasang.','Clear ang eyes, firm ang laman, bright red ang gills.'],
+['Weight and species match','Tugma ang timbang at uri'],['Match the actual catch to the declared species and weight.','Itugma ang aktuwal na huli sa ipinahayag na uri at timbang.','I-match ang actual na huli sa declared species at weight.'],
+['Multi-angle proof reviewed','Nasuri ang patunay sa iba-ibang anggulo'],['Review evidence from top, middle and bottom layers.','Suriin ang ebidensya mula sa itaas, gitna at ilalim.','I-review ang evidence mula top, middle, at bottom.'],
+['Top +','Itaas +'],['Middle +','Gitna +'],['Bottom +','Ilalim +'],['Flag issue','I-flag ang problema','I-flag ang issue'],['Record validation','Itala ang pagsusuri','I-record ang validation'],
+['Recent intake records and inspection results.','Mga kamakailang tala ng pagtanggap at resulta ng inspeksyon.','Recent intake records at inspection results.'],['Passed','Pasado'],['Flagged','Naka-flag'],
+['No validation records yet. Completed inspections appear here.','Wala pang tala ng pagsusuri. Lalabas dito ang mga natapos na inspeksyon.','Wala pang validation records. Dito lalabas ang completed inspections.'],
+['Consignations & Live Bids','Konsignasyon at Live na Taya'],['Watch bulk lots, see a clear Taripa, and keep payment held until inspection passes.','Bantayan ang bulk lots, tingnan ang malinaw na Taripa, at hawakan ang bayad hanggang pumasa sa inspeksyon.','Bantayan ang bulk lots, malinaw na Taripa, at held ang bayad hanggang masuri.'],
+['Active lots','Aktibong lote'],['Tubs in stock','Tub na nasa stock'],['Live bids','Live na taya'],['Volume','Dami'],['Top bid','Pinakamataas na taya'],['Status','Katayuan'],
+['In Transit','Nasa Biyahe'],['Escrow Locked','Naka-lock ang Escrow'],['Awaiting Auction','Naghihintay ng Subasta'],['Starting','Panimula'],['Current top bid','Kasalukuyang pinakamataas na taya'],
+['Edit starting bid','Baguhin ang panimulang taya','I-edit ang starting bid'],['+₱5 bid','+₱5 taya'],['BID HISTORY','KASAYSAYAN NG TAYA'],['No new bids yet.','Wala pang bagong taya.','Wala pang new bids.'],
+['Inspection status of every batch on the floor.','Katayuan ng inspeksyon ng bawat batch sa palengke.','Inspection status ng bawat batch sa floor.'],
+['Too many attempts. Try again later.','Masyadong maraming subok. Subukan ulit mamaya.'],['Password needs 8+ characters with letters and numbers.','Kailangan ng 8+ karakter na may letra at numero ang password.','Kailangan ng 8+ characters na may letters at numbers ang password.'],
+['Wrong ID or password.','Maling ID o password.','Mali ang ID o password.'],['Could not create the profile. Try again.','Hindi nagawa ang profile. Subukan ulit.','Hindi nagawa ang profile. Try again.'],
+['This account is not registered for this portal.','Hindi nakarehistro ang account na ito sa portal na ito.','Hindi registered ang account na ito sa portal na ito.'],
+['Signed out after 15 minutes idle.','Na-sign out dahil 15 minuto kang walang aktibidad.','Na-sign out dahil 15 minutes idle.'],['Portion claimed.','Nakuha na ang bahagi.','Na-claim na ang portion.'],
+['Offline: claim saved on this device. Sync when online.','Offline: nakatabi sa device ang kuha. Mag-sync kapag may koneksyon na.','Offline: naka-save sa device ang claim. Sync kapag online na.'],
+['Still offline. Reconnect to sync.','Offline pa rin. Kumonekta para mag-sync.','Offline pa rin. Mag-reconnect para mag-sync.'],['Escrow released.','Nailabas na ang escrow.','Na-release na ang escrow.'],
+['Fill in every required field before logging.','Punan ang lahat ng kailangang field bago itala.','Fill in lahat ng required fields bago i-log.'],
+['Batch ID not found. Enter or pick an existing CAT-### ID.','Hindi nahanap ang Batch ID. Maglagay ng umiiral na CAT-### ID.','Hindi mahanap ang Batch ID. Maglagay ng existing na CAT-### ID.'],
+['Starting bid updated.','Nabago na ang panimulang taya.','Na-update na ang starting bid.'],['This ID is not registered. Contact the pilot admin.','Hindi nakarehistro ang ID na ito. Makipag-ugnayan sa pilot admin.','Hindi registered ang ID na ito. Contact ang pilot admin.'],['This ID already has an account. Try signing in.','May account na ang ID na ito. Subukang mag-sign in.','May account na ang ID na ito. Try mag-sign in.'],['Invalid or already used invite code.','Hindi wasto o nagamit na ang invite code.','Invalid o nagamit na ang invite code.'],['Enter your invite code.','Ilagay ang iyong invite code.'],['That ID is already registered. Try signing in.','Nakarehistro na ang ID na ito. Subukang mag-sign in.','Registered na ang ID na ito. Try mag-sign in.'],['Could not create the profile. Check your ID format and try again.','Hindi nagawa ang profile. Suriin ang format ng ID at subukan ulit.','Hindi nagawa ang profile. Check ang ID format at try ulit.'],
+['Request access','Humiling ng access'],['No ID yet? Request access','Wala pang ID? Humiling ng access','Wala pang ID? Request access'],
+['No ID yet? Send your details. The pilot admin will review and send you an ID and PIN.','Wala pang ID? Ipadala ang iyong detalye. Susuriin ng pilot admin at ipapadala sa iyo ang ID at PIN.','Wala pang ID? I-send ang details mo. I-review ng pilot admin at ipapadala ang ID at PIN.'],
+['I am a','Ako ay isang'],['Full name','Buong pangalan'],['Existing badge / license # (if any)','Kasalukuyang badge / lisensya # (kung mayroon)'],['SEND REQUEST','IPADALA ANG HILING','I-SEND ANG REQUEST'],['Back to sign in','Bumalik sa sign in'],
+['Personal PIN (from the pilot admin)','Personal na PIN (mula sa pilot admin)'],['Enter your personal PIN.','Ilagay ang iyong personal na PIN.'],['Enter your full name.','Ilagay ang iyong buong pangalan.'],
+['Request sent. The pilot admin will contact you with your ID and PIN.','Naipadala na ang hiling. Makikipag-ugnayan ang pilot admin sa iyo dala ang ID at PIN.','Na-send na ang request. I-contact ka ng pilot admin dala ang ID at PIN.'],
+['Could not send the request. Try again later.','Hindi naipadala ang hiling. Subukan ulit mamaya.'],
+['This ID or PIN is not recognized. Contact the pilot admin.','Hindi kilala ang ID o PIN na ito. Makipag-ugnayan sa pilot admin.','Hindi recognized ang ID o PIN. Contact ang pilot admin.'],
+['Too many wrong PIN attempts. Contact the pilot admin.','Masyadong maraming maling PIN. Makipag-ugnayan sa pilot admin.','Too many wrong PIN attempts. Contact ang pilot admin.'],
+['We will create your ID for you when you finish.','Gagawin namin ang iyong ID pagkatapos mong magrehistro.','Gagawan ka namin ng ID pagkatapos mag-register.'],
+['Pier Location','Lokasyon sa Pantalan'],['Mobile Phone Number (optional)','Numero ng Cellphone (opsyonal)','Mobile Number (optional)'],
+['Account created!','Nagawa na ang account!'],['Your ID is','Ang iyong ID ay'],
+['Save it now. You will use this ID and your password to sign in.','I-save ito ngayon. Gagamitin mo ang ID na ito at ang iyong password para mag-sign in.','I-save na ngayon. Gagamitin mo ang ID na ito at password para mag-sign in.'],
+['Got it','Naintindihan ko'],['Could not create your ID. Try again.','Hindi nagawa ang iyong ID. Subukan ulit.'],
+['Run AI quality check','Patakbuhin ang AI na pagsusuri ng kalidad','Patakbuhin ang AI quality check'],['View evidence','Tingnan ang ebidensya'],['Close','Isara'],
+['Analyzing photos…','Sinusuri ang mga larawan…'],['AI is an assistant. The Pier Checker makes the final decision.','Katulong lamang ang AI. Ang Tagasuri sa Pantalan ang may huling pasya.','Assistant lang ang AI. Ang Pier Checker ang may final decision.'],
+['AI check is unavailable right now. You can still record the validation manually.','Hindi available ang AI ngayon. Maaari mo pa ring itala ang pagsusuri nang mano-mano.','Hindi available ang AI ngayon. Pwede mo pa ring i-record ang validation manually.'],
+['Add all three photos (top, middle, bottom) first.','Idagdag muna ang tatlong larawan (itaas, gitna, ilalim).','Add muna ang tatlong photos (top, middle, bottom).'],
+['Run the AI quality check on the three photos first.','Patakbuhin muna ang AI na pagsusuri sa tatlong larawan.','Patakbuhin muna ang AI quality check sa tatlong photos.'],
+['AI recommends rejecting this lot. Flag the issue or retake the photos.','Inirerekomenda ng AI na tanggihan ang lote. I-flag ang problema o kumuha ulit ng larawan.','Nirerekomenda ng AI na i-reject ang lot. I-flag ang issue o retake ang photos.'],
+['This photo could not be read. Use a JPG or PNG image.','Hindi mabasa ang larawan. Gumamit ng JPG o PNG.','Hindi mabasa ang photo. Gumamit ng JPG o PNG.'],
+['Could not load the evidence.','Hindi ma-load ang ebidensya.']];
+const DT={};D.forEach(r=>DT[r[0]]=r);
+const RULES=[
+[/^(\d+) tubs available$/,'$1 na tub ang available'],[/^(\d+) kg \/ tub$/,'$1 kg bawat tub'],[/^([\d.]+) kg claimed$/,'$1 kg ang nakuha'],[/^([\d.]+) kg open$/,'$1 kg ang bukas'],
+[/^(.+)\/10 Fresh$/,'$1/10 Sariwa'],[/^GRADE (.+)$/,'GRADO $1'],[/^SELECTED · (.+)$/,'NAPILI · $1'],[/^All · (\d+)$/,'Lahat · $1'],
+[/^TARIPA @ (\d+) KG, TOP BID$/,'TARIPA @ $1 KG, PINAKAMATAAS NA TAYA'],[/^ASSIGNED STATION: (.*)$/,'NAKATALAGANG HIMPILAN: $1','ASSIGNED STATION: $1'],
+[/^Base fish price \((.*)\)$/,'Batayang presyo ng isda ($1)'],[/^Effective (.*)$/,'Epektibong presyo $1'],
+[/^(\d+) passes · (.*) total · (\d+) in escrow$/,'$1 pass · $2 kabuuan · $3 nasa escrow','$1 passes · $2 total · $3 sa escrow'],
+[/^Too many attempts\. Try again in (\d+)s\.$/,'Masyadong maraming subok. Subukan ulit pagkalipas ng $1s.','Too many attempts. Subukan ulit in $1s.'],
+[/^Enter a valid (.*) \((.*)\)\.$/,'Maglagay ng wastong $1 ($2).','Maglagay ng valid na $1 ($2).'],
+[/^Enter an amount from 1 to (.*) kg\.$/,'Maglagay ng halagang 1 hanggang $1 kg.','Maglagay ng amount from 1 to $1 kg.'],
+[/^How many kg to claim\? \((.*) kg open\)$/,'Ilang kg ang kukunin? (bukas ang $1 kg)','Ilang kg ang i-claim? ($1 kg open)'],
+[/^(\d) of 4 checks confirmed\. All four are required to pass\.$/,'$1 sa 4 na check lang ang nakumpirma. Kailangan ang lahat ng apat.','$1 of 4 checks lang ang confirmed. Kailangan ang lahat ng apat.'],
+[/^(CAT-\d+) passed Suri-Isda\.$/,'Pumasa ang $1 sa Suri-Isda.','Pasado ang $1 sa Suri-Isda.'],[/^(CAT-\d+) flagged for review\.$/,'Na-flag ang $1 para sa pagsusuri.','Na-flag ang $1 for review.'],
+[/^(CAT-\d+) logged\..*$/,'Naitala ang $1. Nasa palengke na ito bilang hinihintay na pagsusuri.','Na-log na ang $1. Nasa Fresh Catches Floor na ito as pending audit.'],
+[/^(\d+) of (\d+) transaction\(s\) synced\.$/,'$1 sa $2 na transaksyon ang na-sync.','$1 of $2 transactions na-sync.']];
+function tr(m){if(S.lang==='EN')return m;const i=S.lang==='TL'?1:2,r=DT[m];if(r)return r[i]||(i===2?r[1]&&0:0)||(i===2?m:r[1]);
+ for(const x of RULES)if(x[0].test(m))return m.replace(x[0],x[i]||(i===2?'$&':x[1]));
+ const g=m.match(/^(.*) \((\d+)\)$/);if(g&&DT[g[1]])return tr(g[1])+` (${g[2]})`;return m}
+function trDom(r){if(S.lang==='EN')return;const w=document.createTreeWalker(r,NodeFilter.SHOW_TEXT);let n;while(n=w.nextNode()){const t=n.nodeValue,k=t.trim();if(k){const v=tr(k);if(v!==k)n.nodeValue=t.replace(k,()=>v)}}}
+
+/* ---------- router ---------- */
+function view(){const t=S.tab;
+ if(!S.catches.length&&!['intake','sync','passes'].includes(t)&&!(t==='quality'&&S.role==='checker'))return h1('No catches yet','Waiting for a Pier Checker to log the first landing.');
+ if(t==='floor')return floor(0);if(t==='hati')return floor(1);if(t==='taripa')return taripaV();if(t==='sync')return syncV();if(t==='passes')return passes();
+ if(t==='intake')return intake();if(t==='auction')return auction();
+ if(t==='quality')return S.role==='checker'?register():h1('Suri-Isda Quality Guard','Inspection status of every batch on the floor.')+`<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">${S.catches.map(c=>cardC(c,0)).join('')}</div>`}
+function render(){save();document.documentElement.classList.toggle('dark',S.dark);const a=$('#app');
+ if(!S.user){a.innerHTML=head()+login();trDom(a);return}
+ a.innerHTML=head()+nav()+`<main class="max-w-6xl mx-auto p-4 pb-28">${view()}</main>`+bottom()+idModal()+evModal();if(S.tab==='taripa')calc();trDom(a)}
+addEventListener('online',()=>{render();if(S.user&&S.queue.length)toast('Back online. Open Offline Sync to send saved claims.')});addEventListener('offline',render);
+(async()=>{const C=window.DEAL_CONFIG||{};if(C.url&&C.key&&window.supabase){sb=supabase.createClient(new URL(C.url.trim()).origin,C.key.trim(),{auth:{persistSession:true,autoRefreshToken:true}});try{await enter()}catch(e){}}render()})();
+if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('/sw.js').catch(()=>{});
+</script></body></html>
